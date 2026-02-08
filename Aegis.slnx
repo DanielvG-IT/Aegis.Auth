@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Aegis.Auth.Http/Aegis.Auth.Http.csproj" />
+    <Project Path="src/Aegis.Auth.Passkeys/Aegis.Auth.Passkeys.csproj" />
+    <Project Path="src/Aegis.Auth.Totp/Aegis.Auth.Totp.csproj" />
+    <Project Path="src/Aegis.Auth/Aegis.Auth.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Aegis.Auth.Tests/Aegis.Auth.Tests.csproj" />
+  </Folder>
+</Solution>
