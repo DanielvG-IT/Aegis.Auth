@@ -15,10 +15,10 @@ namespace Aegis.Auth.Options
 
     public sealed class EmailAndPasswordOptions
     {
-        public bool Enabled { get; set; }
+        public bool Enabled { get; set; } = true;
         public PasswordOptions Password { get; set; } = new();
-        public bool DisableSignUp { get; set; }
-        public bool RequireEmailVerification { get; set; }
+        public bool DisableSignUp { get; set; } = false;
+        public bool RequireEmailVerification { get; set; } = false;
         public bool AutoSignIn { get; set; } = true;
 
         public int MinPasswordLength { get; set; } = 8;

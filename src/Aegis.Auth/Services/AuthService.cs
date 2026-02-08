@@ -1,4 +1,5 @@
 using Aegis.Auth.Abstractions;
+using Aegis.Auth.Constants;
 using Aegis.Auth.Entities;
 using Aegis.Auth.Options;
 
@@ -17,35 +18,23 @@ namespace Aegis.Auth.Services
             _db = _options.Database;
         }
 
-        public async Task<User> RegisterAsync(string email, string password)
+        public async Task<Result<User>> RegisterAsync(string email, string password)
         {
             if (!_options.EmailAndPassword.Enabled)
-                throw new InvalidOperationException("Password authentication is disabled!");
+                return Result<User>.Failure(AuthErrors.FeatureDisabled, "Password auth is disabled.");
 
             if (string.IsNullOrWhiteSpace(email))
-                throw new ArgumentException("Email is required.");
+                return Result<User>.Failure(AuthErrors.InvalidInput, "Email is required.");
 
-            if (password.Length < _options.EmailAndPassword.MinPasswordLength ||
-                    password.Length > _options.EmailAndPassword.MaxPasswordLength)
-            {
-                throw new ArgumentException($"Password must be between {_options.EmailAndPassword.MinPasswordLength} and {_options.EmailAndPassword.MaxPasswordLength} characters.");
-            }
+            if (password.Length < _options.EmailAndPassword.MinPasswordLength)
+                return Result<User>.Failure(AuthErrors.PasswordTooWeak, "Password is too short.");
 
             var normalizedEmail = email.Trim().ToLowerInvariant();
 
-            var exists = await _db.Users.AnyAsync(u => u.Email == normalizedEmail);
-            if (exists)
-            {
-                Console.WriteLine("Lilbro is definitely here.");
-            }
+            if (await _db.Users.AnyAsync(u => u.Email == normalizedEmail))
+                return Result<User>.Failure(AuthErrors.UserAlreadyExists, "Email already registered.");
 
-            var user = new User
-            {
-                Id = Guid.NewGuid().ToString(),
-                Email = normalizedEmail
-            };
-
-
+            var user = new User { Id = Guid.NewGuid().ToString(), Email = normalizedEmail };
             var account = new Account
             {
                 UserId = user.Id,
@@ -59,14 +48,12 @@ namespace Aegis.Auth.Services
             try
             {
                 await _db.SaveChangesAsync();
+                return user;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                throw new Exception("Registration failed.", ex);
+                return Result<User>.Failure(AuthErrors.InternalError, "Save failed.");
             }
-
-            return user;
         }
     }
-
 }
