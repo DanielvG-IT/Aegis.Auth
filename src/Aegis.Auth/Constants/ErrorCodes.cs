@@ -2,21 +2,31 @@ namespace Aegis.Auth.Constants
 {
   public static class AuthErrors
   {
-    // General
-    public const string FeatureDisabled = "FEATURE_DISABLED";
-    public const string InternalError = "INTERNAL_ERROR";
+    // 🛠️ System & Configuration
+    public static class System
+    {
+      public const string InternalError = "INTERNAL_ERROR";
+      public const string FeatureDisabled = "FEATURE_DISABLED";
+      public const string ProviderNotFound = "PROVIDER_NOT_FOUND";
+      public const string VerificationEmailNotEnabled = "VERIFICATION_EMAIL_NOT_ENABLED";
+      public const string FailedToCreateSession = "FAILED_TO_CREATE_SESSION";
+    }
 
-    // Validation
-    public const string InvalidInput = "INVALID_INPUT";
-    public const string EmailRequired = "EMAIL_REQUIRED";
-    public const string PasswordTooWeak = "PASSWORD_TOO_WEAK";
+    // 📝 Input Validation
+    public static class Validation
+    {
+      public const string InvalidInput = "INVALID_INPUT";
+      public const string EmailRequired = "EMAIL_REQUIRED";
+      public const string PasswordTooWeak = "PASSWORD_TOO_WEAK";
+    }
 
-    // Logic
-    public const string UserAlreadyExists = "USER_ALREADY_EXISTS";
-    public const string InvalidCredentials = "INVALID_CREDENTIALS";
-    public const string EmailNotVerified = "EMAIL_NOT_VERIFIED";
-
-    // Provider
-    public const string ProviderNotFound = "PROVIDER_NOT_FOUND";
+    // 🔐 Identity & Access
+    public static class Identity
+    {
+      public const string InvalidCredentials = "INVALID_CREDENTIALS";
+      public const string InvalidEmailOrPassword = "INVALID_EMAIL_OR_PASSWORD";
+      public const string EmailNotVerified = "EMAIL_NOT_VERIFIED";
+      public const string UserAlreadyExists = "USER_ALREADY_EXISTS";
+    }
   }
 }

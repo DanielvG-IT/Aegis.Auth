@@ -6,7 +6,6 @@ namespace Aegis.Auth.Entities
   public class Account
   {
     public string Id { get; set; } = string.Empty;
-    public string UserId { get; set; } = string.Empty;
     public string AccountId { get; set; } = string.Empty;
     public string ProviderId { get; set; } = string.Empty;
     public string? AccessToken { get; set; } = string.Empty;
@@ -18,5 +17,10 @@ namespace Aegis.Auth.Entities
     public string? PasswordHash { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+
+
+    // Relations
+    public string UserId { get; set; } = string.Empty;
+    public User User { get; set; } = null!;
   }
 }
