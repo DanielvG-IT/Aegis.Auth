@@ -14,8 +14,15 @@ namespace Aegis.Auth
             Message = message;
         }
 
-        public static Result Success() => new(true, null, null);
-        public static Result Failure(string code, string msg) => new(false, code, msg);
+        public static Result Success()
+        {
+            return new(true, null, null);
+        }
+
+        public static Result Failure(string code, string msg)
+        {
+            return new(false, code, msg);
+        }
     }
 
     // For actions that return data
@@ -34,13 +41,23 @@ namespace Aegis.Auth
             Message = message;
         }
 
-        public static Result<T> Success(T value) => new(true, value, null, null);
-        public static Result<T> Failure(string code, string msg) => new(false, default, code, msg);
+        public static Result<T> Success(T value)
+        {
+            return new(true, value, null, null);
+        }
+
+        public static Result<T> Failure(string code, string msg)
+        {
+            return new(false, default, code, msg);
+        }
 
         // Helper to "downgrade" to a plain Result
-        public Result ToResult() => IsSuccess
+        public Result ToResult()
+        {
+            return IsSuccess
             ? Result.Success()
             : Result.Failure(ErrorCode!, Message!);
+        }
 
         // The "Magic" implicit operator
         public static implicit operator Result<T>(T value) => Success(value);
