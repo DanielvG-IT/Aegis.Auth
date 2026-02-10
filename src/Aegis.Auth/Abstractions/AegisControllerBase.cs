@@ -5,10 +5,8 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Aegis.Auth.Abstractions
 {
-  [Route("api/auth")]
-  public abstract class AegisControllerBase(AegisAuthOptions options) : ControllerBase
+  public abstract class AegisControllerBase : ControllerBase
   {
-    protected readonly AegisAuthOptions _options = options;
 
     protected IActionResult HandleResult<T>(Result<T> result)
     {
