@@ -5,4 +5,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/Aegis.Auth.Tests/Aegis.Auth.Tests.csproj" />
   </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/Aegis.Auth.Sample/Aegis.Auth.Sample.csproj" />
+  </Folder>
 </Solution>
