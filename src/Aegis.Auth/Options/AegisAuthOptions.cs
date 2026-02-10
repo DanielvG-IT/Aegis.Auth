@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 
 namespace Aegis.Auth.Options
@@ -7,11 +8,13 @@ namespace Aegis.Auth.Options
         public string AppName { get; set; } = string.Empty;
         public string BaseURL { get; set; } = string.Empty;
         public string Secret { get; set; } = string.Empty;
-        public ICollection<string>? TrustedOrigins { get; set; } = [];
+        public ICollection<string>? TrustedOrigins { get; set; }
         public LogLevel LogLevel { get; set; } = LogLevel.Warning;
 
+        public IDistributedCache? SecondaryStorage { get; set; }
+
         public EmailAndPasswordOptions EmailAndPassword { get; set; } = new();
-        public EmailVerificationOptions? EmailVerification { get; set; } = null;
+        public EmailVerificationOptions? EmailVerification { get; set; }
         public SessionOptions Session { get; set; } = new();
     }
 
