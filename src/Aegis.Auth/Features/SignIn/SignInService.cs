@@ -1,7 +1,7 @@
-using Aegis.Auth.Core.Security;
 using Aegis.Auth.Abstractions;
 using Aegis.Auth.Constants;
 using Aegis.Auth.Entities;
+using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Options;
 
 using EmailValidation;
@@ -12,18 +12,19 @@ namespace Aegis.Auth.Features.SignIn
 {
     public interface ISignInService
     {
-        Task<Result<SignInResult>> SignInEmail(string email, string password, string? callback, bool rememberMe = false);
+        Task<Result<SignInResult>> SignInEmail(SignInEmailInput input);
     }
 
-    internal sealed class SignInService(AegisAuthOptions options, IAegisLogger logger, IAuthDbContext dbContext) : ISignInService
+    internal sealed class SignInService(AegisAuthOptions options, IAegisLogger logger, IAuthDbContext dbContext, ISessionService sessionService) : ISignInService
     {
-        private readonly IAuthDbContext _db = dbContext;
+        private readonly ISessionService _sessionService = sessionService;
         private readonly AegisAuthOptions _options = options;
+        private readonly IAuthDbContext _db = dbContext;
         private readonly IAegisLogger _logger = logger;
 
-        public async Task<Result<SignInResult>> SignInEmail(string email, string password, string? callback, bool rememberMe = false)
+        public async Task<Result<SignInResult>> SignInEmail(SignInEmailInput input)
         {
-            _logger.Debug("SignIn attempt initiated for email: {Email}", email?.ToLowerInvariant() ?? "null");
+            _logger.Debug("SignIn attempt initiated for email: {Email}", input.Email?.ToLowerInvariant() ?? "null");
 
             if (!_options.EmailAndPassword.Enabled)
             {
@@ -31,13 +32,13 @@ namespace Aegis.Auth.Features.SignIn
                 return Result<SignInResult>.Failure(AuthErrors.System.FeatureDisabled, "Password auth is disabled.");
             }
 
-            if (string.IsNullOrWhiteSpace(email))
+            if (string.IsNullOrWhiteSpace(input.Email))
             {
                 _logger.Warning("SignIn attempt failed: Email is missing");
                 return Result<SignInResult>.Failure(AuthErrors.Validation.InvalidInput, "Email is required.");
             }
 
-            var normalizedEmail = email.ToLowerInvariant().Trim();
+            var normalizedEmail = input.Email.ToLowerInvariant().Trim();
             if (!EmailValidator.Validate(normalizedEmail))
             {
                 _logger.Warning("SignIn attempt failed: Invalid email format for {Email}", normalizedEmail);
@@ -60,7 +61,7 @@ namespace Aegis.Auth.Features.SignIn
             if (user is null)
             {
                 _logger.Warning("SignIn failed: User not found for email {Email}. Performing timing-safe hash.", normalizedEmail);
-                await _options.EmailAndPassword.Password.Hash(password);
+                await _options.EmailAndPassword.Password.Hash(input.Password);
                 return Result<SignInResult>.Failure(AuthErrors.Identity.InvalidEmailOrPassword, "Invalid email or password.");
             }
 
@@ -68,7 +69,7 @@ namespace Aegis.Auth.Features.SignIn
             if (credentialAccount is null)
             {
                 _logger.Warning("SignIn failed: No credential account found for user {UserId}", user.Id);
-                await _options.EmailAndPassword.Password.Hash(password);
+                await _options.EmailAndPassword.Password.Hash(input.Password);
                 return Result<SignInResult>.Failure(AuthErrors.Identity.InvalidEmailOrPassword, "Invalid email or password.");
             }
 
@@ -76,11 +77,11 @@ namespace Aegis.Auth.Features.SignIn
             if (string.IsNullOrWhiteSpace(currentPassword))
             {
                 _logger.Warning("SignIn failed: Password hash missing for user {UserId}", user.Id);
-                await _options.EmailAndPassword.Password.Hash(password);
+                await _options.EmailAndPassword.Password.Hash(input.Password);
                 return Result<SignInResult>.Failure(AuthErrors.Identity.InvalidEmailOrPassword, "Invalid email or password.");
             }
 
-            var verifyInput = new PasswordVerifyContext { Hash = currentPassword, Password = password };
+            var verifyInput = new PasswordVerifyContext { Hash = currentPassword, Password = input.Password };
             var isValidPassword = await _options.EmailAndPassword.Password.Verify(verifyInput);
             if (!isValidPassword)
             {
@@ -114,7 +115,7 @@ namespace Aegis.Auth.Features.SignIn
                     var token = string.Empty;
                     var url = string.Empty;
 
-                    var verificationContext = new SendVerificationEmailContext { Token = token, User = user, Url = url, CallbackUri = callback };
+                    var verificationContext = new SendVerificationEmailContext { Token = token, User = user, Url = url, CallbackUri = input.Callback };
                     await _options.EmailVerification.SendVerificationEmail(verificationContext);
 
                     _logger.Info("Verification email sent successfully to user {UserId}", user.Id);
@@ -130,39 +131,25 @@ namespace Aegis.Auth.Features.SignIn
 
             _logger.Debug("Creating session for user {UserId}", user.Id);
 
-            // TODO Generate secure session token
-            var sessionToken = TokenGenerator.GenerateToken(32);
-            DateTime now = DateTime.UtcNow;
-            DateTime expiresAt = now.AddSeconds(_options.Session.ExpiresIn);
-
-            var session = new Session
+            var sessionInput = new SessionCreateInput
             {
-                Id = Guid.NewGuid().ToString(),
-                Token = sessionToken,
-                UserId = user.Id,
-                ExpiresAt = expiresAt,
-                IpAddress = "0.0.0.0", // TODO: Get from HttpContext
-                UserAgent = "Unknown", // TODO: Get from HttpContext
-                CreatedAt = now,
-                UpdatedAt = now
+                DontRememberMe = !input.RememberMe,
+                IpAddress = input.IpAddress,
+                UserAgent = input.UserAgent,
+                User = user
             };
 
-            // Save session to database
-            try
+            // Create and save session
+            Result<Session> session = await _sessionService.CreateSessionAsync(sessionInput);
+            if (!session.IsSuccess || session.Value is null)
             {
-                _db.Sessions.Add(session);
-                await _db.SaveChangesAsync();
-                _logger.Debug("Session created and saved to database for user {UserId}", user.Id);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("SignIn failed: Failed to save session to database for user {UserId}", ex, user.Id);
-                return Result<SignInResult>.Failure(AuthErrors.System.FailedToCreateSession, "Failed to create session.");
+                _logger.Warning("SignIn failed: Failed to create session for user {UserId}", user.Id);
+                return Result<SignInResult>.Failure(AuthErrors.System.FailedToCreateSession, "Failed to create session. Please try again later.");
             }
 
             _logger.Info("SignIn successful for user {UserId}", user.Id);
 
-            return new SignInResult { User = user, Session = session };
+            return new SignInResult { User = user, Session = session.Value };
         }
 
         // public async Task<Result<User>> SignInSocial(string email, string password, string? callback)

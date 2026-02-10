@@ -1,9 +1,10 @@
 using Aegis.Auth.Extensions;
+using Aegis.Auth.Options;
 using Aegis.Auth.Sample.Data;
 
 using Microsoft.EntityFrameworkCore;
 
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
@@ -36,13 +37,13 @@ builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-var app = builder.Build();
+WebApplication app = builder.Build();
 
 // Seed the database
-using (var scope = app.Services.CreateScope())
+using (IServiceScope scope = app.Services.CreateScope())
 {
-    var context = scope.ServiceProvider.GetRequiredService<SampleAuthDbContext>();
-    var options = scope.ServiceProvider.GetRequiredService<Aegis.Auth.Options.AegisAuthOptions>();
+    SampleAuthDbContext context = scope.ServiceProvider.GetRequiredService<SampleAuthDbContext>();
+    AegisAuthOptions options = scope.ServiceProvider.GetRequiredService<Aegis.Auth.Options.AegisAuthOptions>();
     await DataSeeder.SeedDataAsync(context, options);
 }
 

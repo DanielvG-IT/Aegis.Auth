@@ -13,6 +13,16 @@ namespace Aegis.Auth.Features.SignIn
         public bool RememberMe { get; init; } = false;
     }
 
+    public class SignInEmailInput
+    {
+        public required string Email { get; init; }
+        public required string Password { get; init; }
+        public bool RememberMe { get; init; } = false;
+        public string? Callback { get; init; }
+        public required string UserAgent { get; init; }
+        public required string IpAddress { get; init; }
+    }
+
     public class SignInResult
     {
         public required User User { get; set; } // The Entity

@@ -12,7 +12,7 @@ namespace Aegis.Auth.Options
         //* - `null`: Follows `requireEmailVerification` behavior
         public bool? SendOnSignIn { get; set; } = null;
         public bool SendOnSignUp { get; set; } = false;
-        public bool AutoSignInAfterVerification { get; set; } = false;
+        // public bool AutoSignInAfterVerification { get; set; } = false;
 
         public Func<SendVerificationEmailContext, Task>? SendVerificationEmail { get; set; } = null;
 
