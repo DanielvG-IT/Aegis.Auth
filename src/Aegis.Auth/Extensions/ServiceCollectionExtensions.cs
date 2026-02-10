@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.DataProtection;
 
 using Aegis.Auth.Features.SignIn;
 using Aegis.Auth.Features.SignUp;
+using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Infrastructure.Cookies;
 
 using Aegis.Auth.Abstractions;
@@ -26,14 +27,18 @@ namespace Aegis.Auth.Extensions
       services.AddSingleton(options);
       services.TryAddSingleton<IAegisLogger, AegisLogger>();
 
+      // Add a memory cache to mock distributed cache
+      services.AddDistributedMemoryCache();
+
       // Register AegisCookieManager
-      services.AddScoped<AegisCookieManager>(sp =>
+      services.AddScoped(sp =>
       {
         IHostEnvironment env = sp.GetRequiredService<IHostEnvironment>();
         return new AegisCookieManager(options, env.IsDevelopment());
       });
 
       // Map the user's specific DB to your interface
+      services.AddScoped<ISessionService, SessionService>();
       services.AddScoped<IAuthDbContext>(sp => sp.GetRequiredService<TContext>());
 
       // Add interfaced services

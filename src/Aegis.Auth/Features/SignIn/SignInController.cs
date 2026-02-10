@@ -9,7 +9,7 @@ namespace Aegis.Auth.Features.SignIn
 
     [ApiController]
     [Route("api/auth")]
-    internal sealed class SignInController(ISignInService signInService, AegisCookieManager cookieManager) : AegisControllerBase
+    public sealed class SignInController(ISignInService signInService, AegisCookieManager cookieManager) : AegisControllerBase
     {
         [HttpPost("sign-in/email")]
         public async Task<IActionResult> SignInEmail([FromBody] SignInEmailRequest request)
