@@ -115,7 +115,7 @@ namespace Aegis.Auth.Features.SignIn
                     var token = string.Empty;
                     var url = string.Empty;
 
-                    var verificationContext = new SendVerificationEmailContext() { Token = token, User = user, Url = url, CallbackUri = callback };
+                    var verificationContext = new SendVerificationEmailContext { Token = token, User = user, Url = url, CallbackUri = callback };
                     await _options.EmailVerification.SendVerificationEmail(verificationContext);
 
                     _logger.Info("Verification email sent successfully to user {UserId}", user.Id);
@@ -131,7 +131,7 @@ namespace Aegis.Auth.Features.SignIn
 
             _logger.Debug("Creating session for user {UserId}", user.Id);
             // TODO: Create sessiontoken here
-            var session = new Session() { };
+            var session = new Session { };
             if (session is null)
             {
                 _logger.Error("SignIn failed: Session creation failed for user {UserId}", args: user.Id);
@@ -140,8 +140,7 @@ namespace Aegis.Auth.Features.SignIn
 
             _logger.Info("SignIn successful for user {UserId}", user.Id);
 
-
-            return new SignInResult() { User = user, Session = session };
+            return new SignInResult { User = user, Session = session };
         }
 
         // public async Task<Result<User>> SignInSocial(string email, string password, string? callback)

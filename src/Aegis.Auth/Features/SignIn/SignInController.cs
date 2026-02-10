@@ -1,10 +1,10 @@
 using Aegis.Auth.Abstractions;
 using Aegis.Auth.Extensions;
+using Aegis.Auth.Infrastructure.Cookies;
 
 using Microsoft.Extensions.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Aegis.Auth.Options;
 
 namespace Aegis.Auth.Features.SignIn
 {
@@ -12,12 +12,13 @@ namespace Aegis.Auth.Features.SignIn
     [ApiController]
     public class SignInController(
         ISignInService signInService,
-        IHostEnvironment env, AegisAuthOptions options) : AegisControllerBase(options)
+        AegisCookieManager cookieManager
+        ) : AegisControllerBase
     {
         [HttpPost("sign-in/email")]
         public async Task<IActionResult> SignInEmail([FromBody] SignInEmailRequest request)
         {
-            // TODO Validate the input
+            // TODO Validate the signinemail input
             // var validated = request.verify()
 
             Result<SignInResult> result = await signInService.SignInEmail(
@@ -32,16 +33,9 @@ namespace Aegis.Auth.Features.SignIn
 
             SignInResult? data = result.Value;
             if (data is null)
-                return NotFound();
+                return HandleResult(result); // TODO Add extra checks
 
-            Response.Cookies.Append("session", data.Session.Token, new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = !env.IsDevelopment(), // Secure only in Prod
-                SameSite = SameSiteMode.Lax,
-                Expires = data.Session.ExpiresAt,
-                Path = "/" // available site-wide
-            });
+            cookieManager.SetSessionCookie(HttpContext, data.Session, data.User, request.RememberMe);
 
             return Ok(new SignInResponse
             {
