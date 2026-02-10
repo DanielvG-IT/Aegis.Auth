@@ -17,5 +17,20 @@ namespace Aegis.Auth.Extensions
                 CreatedAt = user.CreatedAt
             };
         }
+
+        public static SessionDto ToDto(this Session session)
+        {
+            return new SessionDto
+            {
+                Id = session.Id,
+                UserAgent = session.UserAgent,
+                ExpiresAt = session.ExpiresAt,
+                IpAddress = session.IpAddress,
+                CreatedAt = session.CreatedAt,
+                UpdatedAt = session.UpdatedAt,
+                Token = session.Token,
+                UserId = session.UserId,
+            };
+        }
     }
 }
