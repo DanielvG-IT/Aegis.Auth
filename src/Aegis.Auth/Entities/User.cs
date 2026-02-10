@@ -8,8 +8,8 @@ namespace Aegis.Auth.Entities
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
-    public bool IsEmailVerified { get; set; }
-    public string Image { get; set; } = string.Empty;
+    public bool EmailVerified { get; set; } = false;
+    public string? Image { get; set; } = null;
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

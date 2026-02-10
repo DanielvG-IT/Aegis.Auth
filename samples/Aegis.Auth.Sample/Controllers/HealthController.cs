@@ -56,7 +56,7 @@ public class HealthController(SampleAuthDbContext context, AegisAuthOptions opti
           u.Id,
           u.Email,
           u.Name,
-          u.IsEmailVerified,
+          u.EmailVerified,
           u.CreatedAt,
           accountCount = u.Accounts.Count,
           sessionCount = u.Sessions.Count,

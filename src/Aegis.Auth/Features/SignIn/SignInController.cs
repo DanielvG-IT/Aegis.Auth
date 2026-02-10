@@ -1,15 +1,14 @@
-using Aegis.Auth.Abstractions;
 using Aegis.Auth.Extensions;
+using Aegis.Auth.Abstractions;
 using Aegis.Auth.Infrastructure.Cookies;
 
-using Microsoft.Extensions.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Aegis.Auth.Features.SignIn
 {
 
     [ApiController]
+    [Route("api/auth")]
     public class SignInController(
         ISignInService signInService,
         AegisCookieManager cookieManager

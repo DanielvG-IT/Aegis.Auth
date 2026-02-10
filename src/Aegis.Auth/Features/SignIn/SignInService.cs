@@ -1,9 +1,8 @@
+using Aegis.Auth.Core.Security;
 using Aegis.Auth.Abstractions;
-using Aegis.Auth.Extensions;
 using Aegis.Auth.Constants;
 using Aegis.Auth.Entities;
 using Aegis.Auth.Options;
-using Aegis.Auth.Models;
 
 using EmailValidation;
 
@@ -93,7 +92,7 @@ namespace Aegis.Auth.Features.SignIn
 
             //* ATM User exists, has password and has typed in a valid password!
 
-            if (_options.EmailAndPassword.RequireEmailVerification && !user.IsEmailVerified)
+            if (_options.EmailAndPassword.RequireEmailVerification && !user.EmailVerified)
             {
                 _logger.Info("SignIn blocked: Email not verified for user {UserId}", user.Id);
 
@@ -130,11 +129,34 @@ namespace Aegis.Auth.Features.SignIn
             //* User exists and is all correct state to finalize login
 
             _logger.Debug("Creating session for user {UserId}", user.Id);
-            // TODO: Create sessiontoken here
-            var session = new Session { };
-            if (session is null)
+
+            // TODO Generate secure session token
+            var sessionToken = TokenGenerator.GenerateToken(32);
+            DateTime now = DateTime.UtcNow;
+            DateTime expiresAt = now.AddSeconds(_options.Session.ExpiresIn);
+
+            var session = new Session
             {
-                _logger.Error("SignIn failed: Session creation failed for user {UserId}", args: user.Id);
+                Id = Guid.NewGuid().ToString(),
+                Token = sessionToken,
+                UserId = user.Id,
+                ExpiresAt = expiresAt,
+                IpAddress = "0.0.0.0", // TODO: Get from HttpContext
+                UserAgent = "Unknown", // TODO: Get from HttpContext
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+
+            // Save session to database
+            try
+            {
+                _db.Sessions.Add(session);
+                await _db.SaveChangesAsync();
+                _logger.Debug("Session created and saved to database for user {UserId}", user.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("SignIn failed: Failed to save session to database for user {UserId}", ex, user.Id);
                 return Result<SignInResult>.Failure(AuthErrors.System.FailedToCreateSession, "Failed to create session.");
             }
 

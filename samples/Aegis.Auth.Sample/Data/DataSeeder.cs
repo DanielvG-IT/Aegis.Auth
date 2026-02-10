@@ -19,7 +19,7 @@ public static class DataSeeder
       Id = Guid.NewGuid().ToString(),
       Email = "test@example.com",
       Name = "Test User",
-      IsEmailVerified = true,
+      EmailVerified = true,
       Image = "",
       CreatedAt = DateTime.UtcNow,
       UpdatedAt = DateTime.UtcNow

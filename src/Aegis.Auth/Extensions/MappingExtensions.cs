@@ -12,9 +12,10 @@ namespace Aegis.Auth.Extensions
                 Id = user.Id,
                 Email = user.Email,
                 Name = user.Name,
-                IsEmailVerified = user.IsEmailVerified,
+                EmailVerified = user.EmailVerified,
                 Image = user.Image,
-                CreatedAt = user.CreatedAt
+                CreatedAt = user.CreatedAt,
+                UpdatedAt = user.UpdatedAt
             };
         }
 
