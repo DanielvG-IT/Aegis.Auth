@@ -1,6 +1,8 @@
 using Aegis.Auth.Entities;
 using Aegis.Auth.Models;
 
+using System.Text.Json.Serialization;
+
 namespace Aegis.Auth.Features.SignIn
 {
     public class SignInEmailRequest
@@ -23,6 +25,8 @@ namespace Aegis.Auth.Features.SignIn
         public required UserDto User { get; set; }
         public required string Token { get; set; }
         public bool Redirect { get; set; }
-        public string? Url { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Url { get; set; } = null;
     }
 }

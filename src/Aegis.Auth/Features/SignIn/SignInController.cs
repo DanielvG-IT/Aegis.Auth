@@ -36,12 +36,13 @@ namespace Aegis.Auth.Features.SignIn
 
             cookieManager.SetSessionCookie(HttpContext, data.Session, data.User, request.RememberMe);
 
+            var shouldRedirect = !string.IsNullOrWhiteSpace(request.Callback);
             return Ok(new SignInResponse
             {
                 User = data.User.ToDto(),
                 Token = data.Session.Token,
-                Redirect = !string.IsNullOrWhiteSpace(request.Callback),
-                Url = request.Callback
+                Redirect = shouldRedirect,
+                Url = shouldRedirect ? request.Callback : null
             });
         }
 
