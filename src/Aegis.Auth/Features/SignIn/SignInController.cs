@@ -4,6 +4,7 @@ using Aegis.Auth.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Aegis.Auth.Options;
 
 namespace Aegis.Auth.Features.SignIn
 {
@@ -11,7 +12,7 @@ namespace Aegis.Auth.Features.SignIn
     [ApiController]
     public class SignInController(
         ISignInService signInService,
-        IHostEnvironment env) : AegisControllerBase
+        IHostEnvironment env, AegisAuthOptions options) : AegisControllerBase(options)
     {
         [HttpPost("sign-in/email")]
         public async Task<IActionResult> SignInEmail([FromBody] SignInEmailRequest request)
@@ -50,5 +51,12 @@ namespace Aegis.Auth.Features.SignIn
                 Url = request.Callback
             });
         }
+
+        // [HttpPost("sign-in/social")]
+        // public async Task<IActionResult> SignInSocial([FromBody] SignInSocialRequest request)
+        // {
+        //     Result<SignInResult> result = await signInService.SignInSocial();
+        //     return null!;
+        // }
     }
 }

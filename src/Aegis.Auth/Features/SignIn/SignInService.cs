@@ -141,7 +141,7 @@ namespace Aegis.Auth.Features.SignIn
             _logger.Info("SignIn successful for user {UserId}", user.Id);
 
 
-            return new SignInResult() { User = user, Session = session };    //Lilbro is logged in
+            return new SignInResult() { User = user, Session = session };
         }
 
         // public async Task<Result<User>> SignInSocial(string email, string password, string? callback)

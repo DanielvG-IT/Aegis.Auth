@@ -1,17 +1,19 @@
 using Aegis.Auth.Constants;
+using Aegis.Auth.Options;
 
 using Microsoft.AspNetCore.Mvc;
 
 namespace Aegis.Auth.Abstractions
 {
   [Route("api/auth")]
-  public abstract class AegisControllerBase : ControllerBase
+  public abstract class AegisControllerBase(AegisAuthOptions options) : ControllerBase
   {
+    protected readonly AegisAuthOptions _options = options;
+
     protected IActionResult HandleResult<T>(Result<T> result)
     {
       if (result.IsSuccess) return Ok(result.Value);
 
-      // Using your actual constants for type-safety
       return result.ErrorCode switch
       {
         // 401 Unauthorized
