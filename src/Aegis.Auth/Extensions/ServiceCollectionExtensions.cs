@@ -1,8 +1,11 @@
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.AspNetCore.DataProtection;
 
 using Aegis.Auth.Features.SignIn;
 using Aegis.Auth.Features.SignUp;
+using Aegis.Auth.Infrastructure.Cookies;
 
 using Aegis.Auth.Abstractions;
 using Aegis.Auth.Options;
@@ -22,6 +25,13 @@ namespace Aegis.Auth.Extensions
 
       services.AddSingleton(options);
       services.TryAddSingleton<IAegisLogger, AegisLogger>();
+
+      // Register AegisCookieManager
+      services.AddScoped<AegisCookieManager>(sp =>
+      {
+        IHostEnvironment env = sp.GetRequiredService<IHostEnvironment>();
+        return new AegisCookieManager(options, env.IsDevelopment());
+      });
 
       // Map the user's specific DB to your interface
       services.AddScoped<IAuthDbContext>(sp => sp.GetRequiredService<TContext>());
