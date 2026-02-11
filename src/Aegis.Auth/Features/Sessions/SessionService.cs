@@ -23,25 +23,26 @@ namespace Aegis.Auth.Features.Sessions
 
     public async Task<Result<Session>> CreateSessionAsync(SessionCreateInput input)
     {
-      var storeInDb = _options.Session.StoreSessionInDatabase;
       var sessionExpiration = _options.Session.ExpiresIn != 0 ? _options.Session.ExpiresIn : 60 * 60 * 24 * 7; // 7 days in seconds
+      var now = DateTime.UtcNow;
+      var nowUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
       var data = new Session
       {
+        Id = Guid.CreateVersion7().ToString(),
         IpAddress = input.IpAddress,
         UserAgent = input.UserAgent,
 
         // If the user doesn't want to be remembered, set the session to expire in 1 day.
         // The cookie will be set to expire at the end of the session
-        ExpiresAt = input.DontRememberMe ? DateTime.UtcNow.AddDays(1) : DateTime.UtcNow.AddSeconds(sessionExpiration),
+        ExpiresAt = input.DontRememberMe ? now.AddDays(1) : now.AddSeconds(sessionExpiration),
         UserId = input.User.Id,
         User = input.User,
         Token = RandomStringGenerator.Generate(32, "a-z", "A-Z", "0-9"),
-        CreatedAt = DateTime.UtcNow,
-        UpdatedAt = DateTime.UtcNow,
+        CreatedAt = now,
+        UpdatedAt = now,
         // Possible override values later here
       };
-      var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
       // Always store in SecondaryStorage when available, 
       if (_options.SecondaryStorage is not null)
@@ -54,18 +55,21 @@ namespace Aegis.Auth.Features.Sessions
         if (!string.IsNullOrWhiteSpace(currentListJson))
         {
           // Deserialize from cache
-          list = JsonSerializer.Deserialize<List<SessionReference>>(currentListJson) ?? [];
-          // Filter: remove expired and duplicates
-          list = [.. list.Where(s => s.ExpiresAt > now && s.Token != data.Token)];
+          var cachedList = JsonSerializer.Deserialize<List<SessionReference>>(currentListJson);
+          if (cachedList is not null)
+          {
+            // Filter: remove expired and duplicates (in-place to avoid extra allocation)
+            list = cachedList.Where(s => s.ExpiresAt > nowUnixMs && s.Token != data.Token).ToList();
+          }
         }
 
         // 2. Add new session and Sort to find the furthest expiry
         list.Add(new SessionReference { Token = data.Token, ExpiresAt = new DateTimeOffset(data.ExpiresAt).ToUnixTimeMilliseconds() });
-        list = [.. list.OrderBy(s => s.ExpiresAt)];
+        list.Sort((a, b) => a.ExpiresAt.CompareTo(b.ExpiresAt)); // In-place sort, more efficient
 
         // 3. Calculate TTL for the Registry
-        var furthestSessionExp = list.LastOrDefault()?.ExpiresAt ?? now;
-        var furthestSessionTTL = (furthestSessionExp - now) / 1000; // Convert to seconds
+        var furthestSessionExp = list.LastOrDefault()?.ExpiresAt ?? nowUnixMs;
+        var furthestSessionTTL = (furthestSessionExp - nowUnixMs) / 1000; // Convert to seconds
 
         if (furthestSessionTTL > 0)
         {
@@ -73,7 +77,7 @@ namespace Aegis.Auth.Features.Sessions
         }
 
         // 4. Cache the Full Session + User Data
-        var sessionTTL = (new DateTimeOffset(data.ExpiresAt).ToUnixTimeMilliseconds() - now) / 1000;
+        var sessionTTL = (new DateTimeOffset(data.ExpiresAt).ToUnixTimeMilliseconds() - nowUnixMs) / 1000;
         if (sessionTTL > 0)
         {
           var sessionCacheData = JsonSerializer.Serialize(new SessionCacheJson { Session = data, User = input.User });
@@ -88,7 +92,7 @@ namespace Aegis.Auth.Features.Sessions
       // if enabled or no SecondaryStorage (also) store in DB 
       if (_options.Session.StoreSessionInDatabase || _options.SecondaryStorage is null)
       {
-        await _db.Sessions.AddAsync(data);
+        _db.Sessions.Add(data);
         await _db.SaveChangesAsync();
       }
 

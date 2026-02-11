@@ -38,7 +38,7 @@ namespace Aegis.Auth.Features.SignIn
                 return Result<SignInResult>.Failure(AuthErrors.Validation.InvalidInput, "Email is required.");
             }
 
-            var normalizedEmail = input.Email.ToLowerInvariant().Trim();
+            var normalizedEmail = input.Email.Trim().ToLowerInvariant();
             if (!EmailValidator.Validate(normalizedEmail))
             {
                 _logger.Warning("SignIn attempt failed: Invalid email format for {Email}", normalizedEmail);
@@ -49,7 +49,9 @@ namespace Aegis.Auth.Features.SignIn
             User? user = null;
             try
             {
-                user = await _db.Users.Include(u => u.Accounts).FirstOrDefaultAsync(u => u.Email == normalizedEmail);
+                user = await _db.Users
+                    .Include(u => u.Accounts.Where(a => a.ProviderId == "credential"))
+                    .FirstOrDefaultAsync(u => u.Email == normalizedEmail);
                 _logger.Debug("Database lookup completed for email: {Email}", normalizedEmail);
             }
             catch (Exception ex)
@@ -65,7 +67,8 @@ namespace Aegis.Auth.Features.SignIn
                 return Result<SignInResult>.Failure(AuthErrors.Identity.InvalidEmailOrPassword, "Invalid email or password.");
             }
 
-            Account? credentialAccount = user.Accounts.FirstOrDefault(a => a.ProviderId == "credential");
+            // Already filtered to credential accounts in the Include above
+            Account? credentialAccount = user.Accounts.SingleOrDefault();
             if (credentialAccount is null)
             {
                 _logger.Warning("SignIn failed: No credential account found for user {UserId}", user.Id);

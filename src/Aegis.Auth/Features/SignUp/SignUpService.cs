@@ -31,20 +31,31 @@ namespace Aegis.Auth.Features.SignUp
             if (password.Length < _options.EmailAndPassword.MinPasswordLength)
                 return Result<User>.Failure(AuthErrors.Validation.PasswordTooWeak, "Password is too short.");
 
-            var normalizedEmail = email.ToLowerInvariant().Trim();
+            var normalizedEmail = email.Trim().ToLowerInvariant();
             if (!EmailValidator.Validate(normalizedEmail))
                 return Result<User>.Failure(AuthErrors.Validation.InvalidInput, "Email not valid.");
 
-            var exists = await _db.Users.AnyAsync(u => u.Email == normalizedEmail);
+            var exists = await _db.Users.AsNoTracking().AnyAsync(u => u.Email == normalizedEmail);
             if (exists)
                 return Result<User>.Failure(AuthErrors.Identity.UserAlreadyExists, "Email already registered.");
 
-            var user = new User { Id = Guid.NewGuid().ToString(), Email = normalizedEmail };
+            DateTime now = DateTime.UtcNow;
+            var user = new User
+            {
+                Id = Guid.CreateVersion7().ToString(),
+                Email = normalizedEmail,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
             var account = new Account
             {
+                Id = Guid.CreateVersion7().ToString(),
+                AccountId = normalizedEmail,
                 UserId = user.Id,
                 ProviderId = "credential",
-                PasswordHash = await _options.EmailAndPassword.Password.Hash(password)
+                PasswordHash = await _options.EmailAndPassword.Password.Hash(password),
+                CreatedAt = now,
+                UpdatedAt = now
             };
 
             // TODO: Run applicable hook

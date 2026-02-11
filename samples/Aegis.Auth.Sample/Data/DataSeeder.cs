@@ -13,16 +13,18 @@ public static class DataSeeder
       return;
     }
 
+    var now = DateTime.UtcNow;
+
     // Create a test user
     var user = new User
     {
-      Id = Guid.NewGuid().ToString(),
+      Id = Guid.CreateVersion7().ToString(),
       Email = "test@example.com",
       Name = "Test User",
       EmailVerified = true,
       Image = "",
-      CreatedAt = DateTime.UtcNow,
-      UpdatedAt = DateTime.UtcNow
+      CreatedAt = now,
+      UpdatedAt = now
     };
 
     context.Users.Add(user);
@@ -33,13 +35,13 @@ public static class DataSeeder
 
     var account = new Account
     {
-      Id = Guid.NewGuid().ToString(),
+      Id = Guid.CreateVersion7().ToString(),
       AccountId = user.Email,
       ProviderId = "credential",
       PasswordHash = hashedPassword,
       UserId = user.Id,
-      CreatedAt = DateTime.UtcNow,
-      UpdatedAt = DateTime.UtcNow
+      CreatedAt = now,
+      UpdatedAt = now
     };
 
     context.Accounts.Add(account);

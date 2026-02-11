@@ -34,6 +34,9 @@ public class SampleAuthDbContext(DbContextOptions<SampleAuthDbContext> options) 
     modelBuilder.Entity<Account>(entity =>
     {
       entity.HasKey(e => e.Id);
+      entity.HasIndex(e => e.UserId);
+      entity.HasIndex(e => e.ProviderId);
+      entity.HasIndex(e => new { e.UserId, e.ProviderId }); // Composite index for credential lookups
       entity.HasOne(e => e.User)
               .WithMany(u => u.Accounts)
               .HasForeignKey(e => e.UserId)
@@ -44,6 +47,9 @@ public class SampleAuthDbContext(DbContextOptions<SampleAuthDbContext> options) 
     modelBuilder.Entity<Session>(entity =>
     {
       entity.HasKey(e => e.Id);
+      entity.HasIndex(e => e.Token).IsUnique(); // Session lookups by token
+      entity.HasIndex(e => e.UserId); // User's sessions queries
+      entity.HasIndex(e => e.ExpiresAt); // Cleanup/expiration queries
       entity.HasOne(e => e.User)
               .WithMany(u => u.Sessions)
               .HasForeignKey(e => e.UserId)

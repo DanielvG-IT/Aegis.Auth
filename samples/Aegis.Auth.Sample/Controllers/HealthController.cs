@@ -16,8 +16,8 @@ public class HealthController(SampleAuthDbContext context, AegisAuthOptions opti
   [HttpGet]
   public async Task<IActionResult> Get()
   {
-    var userCount = await _context.Users.CountAsync();
-    var accountCount = await _context.Accounts.CountAsync();
+    var userCount = await _context.Users.AsNoTracking().CountAsync();
+    var accountCount = await _context.Accounts.AsNoTracking().CountAsync();
 
     return Ok(new
     {
@@ -49,8 +49,7 @@ public class HealthController(SampleAuthDbContext context, AegisAuthOptions opti
   public async Task<IActionResult> GetUsers()
   {
     var users = await _context.Users
-        .Include(u => u.Accounts)
-        .Include(u => u.Sessions)
+        .AsNoTracking()
         .Select(u => new
         {
           u.Id,
