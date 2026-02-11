@@ -16,10 +16,10 @@ namespace Aegis.Auth.Logging
         private static object[] SanitizeArgs(object[] args)
         {
             if (args is null || args.Length == 0)
-                return args;
+                return [];
 
             var sanitized = new object[args.Length];
-            for (int i = 0; i < args.Length; i++)
+            for (var i = 0; i < args.Length; i++)
             {
                 if (args[i] is string s)
                 {
@@ -38,62 +38,62 @@ namespace Aegis.Auth.Logging
 
         public void Trace(string message, params object[] args)
         {
-            if (IsEnabled(LogLevel.Trace))
-            {
+            if (!IsEnabled(LogLevel.Trace) || !_logger.IsEnabled(LogLevel.Trace))
+                return;
+
 #pragma warning disable CA2254
-                _logger.LogTrace(message, SanitizeArgs(args));
+            _logger.LogTrace(message, SanitizeArgs(args));
 #pragma warning restore CA2254
-            }
         }
 
         public void Debug(string message, params object[] args)
         {
-            if (IsEnabled(LogLevel.Debug))
-            {
+            if (!IsEnabled(LogLevel.Debug) || !_logger.IsEnabled(LogLevel.Debug))
+                return;
+
 #pragma warning disable CA2254
-                _logger.LogDebug(message, SanitizeArgs(args));
+            _logger.LogDebug(message, SanitizeArgs(args));
 #pragma warning restore CA2254
-            }
         }
 
         public void Info(string message, params object[] args)
         {
-            if (IsEnabled(LogLevel.Information))
-            {
+            if (!IsEnabled(LogLevel.Information) || !_logger.IsEnabled(LogLevel.Information))
+                return;
+
 #pragma warning disable CA2254
-                _logger.LogInformation(message, SanitizeArgs(args));
+            _logger.LogInformation(message, SanitizeArgs(args));
 #pragma warning restore CA2254
-            }
         }
 
         public void Warning(string message, params object[] args)
         {
-            if (IsEnabled(LogLevel.Warning))
-            {
+            if (!IsEnabled(LogLevel.Warning) || !_logger.IsEnabled(LogLevel.Warning))
+                return;
+
 #pragma warning disable CA2254
-                _logger.LogWarning(message, SanitizeArgs(args));
+            _logger.LogWarning(message, SanitizeArgs(args));
 #pragma warning restore CA2254
-            }
         }
 
         public void Error(string message, Exception? ex = null, params object[] args)
         {
-            if (IsEnabled(LogLevel.Error))
-            {
+            if (!IsEnabled(LogLevel.Error) || !_logger.IsEnabled(LogLevel.Error))
+                return;
+
 #pragma warning disable CA2254
-                _logger.LogError(ex, message, SanitizeArgs(args));
+            _logger.LogError(ex, message, SanitizeArgs(args));
 #pragma warning restore CA2254
-            }
         }
 
         public void Critical(string message, Exception? ex = null, params object[] args)
         {
-            if (IsEnabled(LogLevel.Critical))
-            {
+            if (!IsEnabled(LogLevel.Critical) || !_logger.IsEnabled(LogLevel.Critical))
+                return;
+
 #pragma warning disable CA2254
-                _logger.LogCritical(ex, message, SanitizeArgs(args));
+            _logger.LogCritical(ex, message, SanitizeArgs(args));
 #pragma warning restore CA2254
-            }
         }
     }
 }
