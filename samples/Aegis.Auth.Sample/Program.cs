@@ -22,7 +22,7 @@ builder.Services.AddAegisAuth<SampleAuthDbContext>(options =>
 
     // Enable email/password authentication
     options.EmailAndPassword.Enabled = true;
-    options.EmailAndPassword.RequireEmailVerification = false; // Disable for testing
+    // Note: Email verification is disabled in v0.1 (will be available in v0.2)
 
     // Configure session
     options.Session.ExpiresIn = 3600; // 1 hour

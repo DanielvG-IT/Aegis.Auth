@@ -1,3 +1,8 @@
+// ═══════════════════════════════════════════════════════════════════════════════
+// EMAIL VERIFICATION - DISABLED FOR v0.1, WILL BE RE-ENABLED IN v0.2
+// ═══════════════════════════════════════════════════════════════════════════════
+// TODO v0.2: Uncomment this entire file for email verification support
+/*
 using Aegis.Auth.Entities;
 
 namespace Aegis.Auth.Options
@@ -30,3 +35,5 @@ namespace Aegis.Auth.Options
         public string? CallbackUri { get; init; }
     }
 }
+*/
+// ═══════════════════════════════════════════════════════════════════════════════

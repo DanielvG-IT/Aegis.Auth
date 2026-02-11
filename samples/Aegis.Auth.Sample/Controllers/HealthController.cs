@@ -33,7 +33,7 @@ public class HealthController(SampleAuthDbContext context, AegisAuthOptions opti
         appName = _options.AppName,
         baseUrl = _options.BaseURL,
         emailPasswordEnabled = _options.EmailAndPassword.Enabled,
-        requireEmailVerification = _options.EmailAndPassword.RequireEmailVerification,
+        // requireEmailVerification = disabled for v0.1 (will be in v0.2)
         sessionExpiresIn = _options.Session.ExpiresIn,
         cookieCacheEnabled = _options.Session.CookieCache?.Enabled ?? false
       },

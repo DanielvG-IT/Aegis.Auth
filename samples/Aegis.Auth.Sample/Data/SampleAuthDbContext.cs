@@ -10,7 +10,13 @@ public class SampleAuthDbContext(DbContextOptions<SampleAuthDbContext> options) 
   public DbSet<User> Users { get; set; } = null!;
   public DbSet<Account> Accounts { get; set; } = null!;
   public DbSet<Session> Sessions { get; set; } = null!;
-  public DbSet<Verification> Verifications { get; set; } = null!;
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // EMAIL VERIFICATION - DISABLED FOR v0.1, WILL BE RE-ENABLED IN v0.2
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // TODO v0.2: Uncomment this for email verification support
+  // public DbSet<Verification> Verifications { get; set; } = null!;
+  // ═══════════════════════════════════════════════════════════════════════════════
 
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
@@ -44,10 +50,17 @@ public class SampleAuthDbContext(DbContextOptions<SampleAuthDbContext> options) 
               .OnDelete(DeleteBehavior.Cascade);
     });
 
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // EMAIL VERIFICATION - DISABLED FOR v0.1, WILL BE RE-ENABLED IN v0.2
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // TODO v0.2: Uncomment this for email verification support
+    /*
     // Verification configuration
     modelBuilder.Entity<Verification>(entity =>
     {
       entity.HasKey(e => e.Id);
     });
+    */
+    // ═══════════════════════════════════════════════════════════════════════════════
   }
 }

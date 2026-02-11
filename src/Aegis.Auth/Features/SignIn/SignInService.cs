@@ -1,7 +1,7 @@
+using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Abstractions;
 using Aegis.Auth.Constants;
 using Aegis.Auth.Entities;
-using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Options;
 
 using EmailValidation;
@@ -93,6 +93,11 @@ namespace Aegis.Auth.Features.SignIn
 
             //* ATM User exists, has password and has typed in a valid password!
 
+            // ═══════════════════════════════════════════════════════════════════════════════
+            // EMAIL VERIFICATION - DISABLED FOR v0.1, WILL BE RE-ENABLED IN v0.2
+            // ═══════════════════════════════════════════════════════════════════════════════
+            // TODO v0.2: Uncomment this entire block for email verification support
+            /*
             if (_options.EmailAndPassword.RequireEmailVerification && !user.EmailVerified)
             {
                 _logger.Info("SignIn blocked: Email not verified for user {UserId}", user.Id);
@@ -126,6 +131,8 @@ namespace Aegis.Auth.Features.SignIn
                 _logger.Warning("SignIn blocked: Email not verified and SendOnSignIn is disabled for user {UserId}", user.Id);
                 return Result<SignInResult>.Failure(AuthErrors.Identity.EmailNotVerified, "Email is not verified.");
             }
+            */
+            // ═══════════════════════════════════════════════════════════════════════════════
 
             //* User exists and is all correct state to finalize login
 

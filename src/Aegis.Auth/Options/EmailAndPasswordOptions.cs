@@ -7,8 +7,14 @@ namespace Aegis.Auth.Options
         public bool DisableSignUp { get; set; } = false;
 
         public bool AutoSignIn { get; set; } = true;
-        public bool RequireEmailVerification { get; set; } = false;
-        public Func<string, Task<string>>? SendVerificationEmail { get; set; }
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // EMAIL VERIFICATION - DISABLED FOR v0.1, WILL BE RE-ENABLED IN v0.2
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // TODO v0.2: Uncomment these properties for email verification support
+        // public bool RequireEmailVerification { get; set; } = false;
+        // public Func<string, Task<string>>? SendVerificationEmail { get; set; }
+        // ═══════════════════════════════════════════════════════════════════════════════
 
         public int MinPasswordLength { get; set; } = 8;
         public int MaxPasswordLength { get; set; } = 128;
