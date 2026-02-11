@@ -12,12 +12,36 @@ namespace Aegis.Auth.Logging
         // Helper to check if we should even bother logging
         private bool IsEnabled(LogLevel level) => options.LogLevel != LogLevel.None && options.LogLevel <= level;
 
+        // Sanitize user-provided values before logging to prevent log forging
+        private static object[] SanitizeArgs(object[] args)
+        {
+            if (args is null || args.Length == 0)
+                return args;
+
+            var sanitized = new object[args.Length];
+            for (int i = 0; i < args.Length; i++)
+            {
+                if (args[i] is string s)
+                {
+                    // Remove carriage returns, newlines, and other control characters
+                    var filtered = new string(s.Where(c => !char.IsControl(c)).ToArray());
+                    sanitized[i] = filtered;
+                }
+                else
+                {
+                    sanitized[i] = args[i];
+                }
+            }
+
+            return sanitized;
+        }
+
         public void Trace(string message, params object[] args)
         {
             if (IsEnabled(LogLevel.Trace))
             {
 #pragma warning disable CA2254
-                _logger.LogTrace(message, args);
+                _logger.LogTrace(message, SanitizeArgs(args));
 #pragma warning restore CA2254
             }
         }
@@ -27,7 +51,7 @@ namespace Aegis.Auth.Logging
             if (IsEnabled(LogLevel.Debug))
             {
 #pragma warning disable CA2254
-                _logger.LogDebug(message, args);
+                _logger.LogDebug(message, SanitizeArgs(args));
 #pragma warning restore CA2254
             }
         }
@@ -37,7 +61,7 @@ namespace Aegis.Auth.Logging
             if (IsEnabled(LogLevel.Information))
             {
 #pragma warning disable CA2254
-                _logger.LogInformation(message, args);
+                _logger.LogInformation(message, SanitizeArgs(args));
 #pragma warning restore CA2254
             }
         }
@@ -47,7 +71,7 @@ namespace Aegis.Auth.Logging
             if (IsEnabled(LogLevel.Warning))
             {
 #pragma warning disable CA2254
-                _logger.LogWarning(message, args);
+                _logger.LogWarning(message, SanitizeArgs(args));
 #pragma warning restore CA2254
             }
         }
@@ -57,7 +81,7 @@ namespace Aegis.Auth.Logging
             if (IsEnabled(LogLevel.Error))
             {
 #pragma warning disable CA2254
-                _logger.LogError(ex, message, args);
+                _logger.LogError(ex, message, SanitizeArgs(args));
 #pragma warning restore CA2254
             }
         }
@@ -67,7 +91,7 @@ namespace Aegis.Auth.Logging
             if (IsEnabled(LogLevel.Critical))
             {
 #pragma warning disable CA2254
-                _logger.LogCritical(ex, message, args);
+                _logger.LogCritical(ex, message, SanitizeArgs(args));
 #pragma warning restore CA2254
             }
         }
