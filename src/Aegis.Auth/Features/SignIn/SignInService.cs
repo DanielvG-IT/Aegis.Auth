@@ -24,7 +24,7 @@ namespace Aegis.Auth.Features.SignIn
 
         public async Task<Result<SignInResult>> SignInEmail(SignInEmailInput input)
         {
-            _logger.Debug("SignIn attempt initiated for email: {Email}", input.Email?.ToLowerInvariant() ?? "null");
+            _logger.Debug("SignIn attempt initiated for email sign-in.");
 
             if (!_options.EmailAndPassword.Enabled)
             {
@@ -41,7 +41,7 @@ namespace Aegis.Auth.Features.SignIn
             var normalizedEmail = input.Email.Trim().ToLowerInvariant();
             if (!EmailValidator.Validate(normalizedEmail))
             {
-                _logger.Warning("SignIn attempt failed: Invalid email format for {Email}", normalizedEmail);
+                _logger.Warning("SignIn attempt failed: Invalid email format.");
                 return Result<SignInResult>.Failure(AuthErrors.Validation.InvalidInput, "Email not valid.");
             }
 
@@ -52,17 +52,17 @@ namespace Aegis.Auth.Features.SignIn
                 user = await _db.Users
                     .Include(u => u.Accounts.Where(a => a.ProviderId == "credential"))
                     .FirstOrDefaultAsync(u => u.Email == normalizedEmail);
-                _logger.Debug("Database lookup completed for email: {Email}", normalizedEmail);
+                _logger.Debug("SignIn database lookup completed for provided email.");
             }
             catch (Exception ex)
             {
-                _logger.Error("SignIn failed: Database lookup error for email {Email}", ex, normalizedEmail);
+                _logger.Error("SignIn failed: Database lookup error for provided email.", ex);
                 return Result<SignInResult>.Failure(AuthErrors.System.InternalError, "Database lookup failed.");
             }
 
             if (user is null)
             {
-                _logger.Warning("SignIn failed: User not found for email {Email}. Performing timing-safe hash.", normalizedEmail);
+                _logger.Warning("SignIn failed: User not found for provided email. Performing timing-safe hash.");
                 await _options.EmailAndPassword.Password.Hash(input.Password);
                 return Result<SignInResult>.Failure(AuthErrors.Identity.InvalidEmailOrPassword, "Invalid email or password.");
             }
