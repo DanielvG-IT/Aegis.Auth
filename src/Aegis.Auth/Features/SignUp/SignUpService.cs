@@ -17,11 +17,11 @@ namespace Aegis.Auth.Features.SignUp
         Task<Result<SignUpResult>> SignUpEmail(SignUpEmailInput input);
     }
 
-    internal sealed partial class SignUpService(AegisAuthOptions options, ILoggerFactory loggerFactory, IAuthDbContext dbContext, SessionService sessionService) : ISignUpService
+    internal sealed partial class SignUpService(AegisAuthOptions options, ILoggerFactory loggerFactory, IAuthDbContext dbContext, ISessionService sessionService) : ISignUpService
     {
         private readonly IAuthDbContext _db = dbContext;
         private readonly AegisAuthOptions _options = options;
-        private readonly SessionService _sessionService = sessionService;
+        private readonly ISessionService _sessionService = sessionService;
         private readonly ILogger _logger = loggerFactory.CreateLogger<SignUpService>();
 
         public async Task<Result<SignUpResult>> SignUpEmail(SignUpEmailInput input)
