@@ -9,7 +9,7 @@ namespace Aegis.Auth.Features.SignIn
 
     [ApiController]
     [Route("api/auth")]
-    public sealed class SignInController(ISignInService signInService, AegisCookieManager cookieManager) : AegisControllerBase
+    public sealed class SignInController(ISignInService signInService, SessionCookieHandler cookieManager) : AegisControllerBase
     {
         [HttpPost("sign-in/email")]
         public async Task<IActionResult> SignInEmail([FromBody] SignInEmailRequest request)
@@ -26,15 +26,14 @@ namespace Aegis.Auth.Features.SignIn
                 IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             };
             Result<SignInResult> result = await signInService.SignInEmail(emailInput);
-            if (!result.IsSuccess || result.Value is null)
+            if (result.IsSuccess is false || result.Value is null)
                 return HandleResult(result);
 
             SignInResult data = result.Value;
 
             cookieManager.SetSessionCookie(HttpContext, data.Session, data.User, request.RememberMe);
 
-            var shouldRedirect = !string.IsNullOrWhiteSpace(request.Callback);
-
+            var shouldRedirect = string.IsNullOrWhiteSpace(request.Callback) is false;
             if (shouldRedirect)
                 HttpContext.Response.Headers.Location = request.Callback;
 

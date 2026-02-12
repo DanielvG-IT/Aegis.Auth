@@ -28,7 +28,7 @@ namespace Aegis.Auth.Features.SignIn
         {
             _logger.SignInAttemptInitiated();
 
-            if (!_options.EmailAndPassword.Enabled)
+            if (_options.EmailAndPassword.Enabled is false)
             {
                 _logger.SignInFeatureDisabled();
                 return Result<SignInResult>.Failure(AuthErrors.System.FeatureDisabled, "Password auth is disabled.");
@@ -41,7 +41,7 @@ namespace Aegis.Auth.Features.SignIn
             }
 
             var normalizedEmail = input.Email.Trim().ToLowerInvariant();
-            if (!EmailValidator.Validate(normalizedEmail))
+            if (EmailValidator.Validate(normalizedEmail) is false)
             {
                 _logger.SignInInvalidEmailFormat();
                 return Result<SignInResult>.Failure(AuthErrors.Validation.InvalidInput, "Email not valid.");
@@ -88,7 +88,7 @@ namespace Aegis.Auth.Features.SignIn
 
             var verifyInput = new PasswordVerifyContext { Hash = currentPassword, Password = input.Password };
             var isValidPassword = await _options.EmailAndPassword.Password.Verify(verifyInput);
-            if (!isValidPassword)
+            if (isValidPassword is false)
             {
                 _logger.SignInInvalidPassword(user.Id);
                 return Result<SignInResult>.Failure(AuthErrors.Identity.InvalidEmailOrPassword, "Invalid email or password.");
@@ -153,7 +153,7 @@ namespace Aegis.Auth.Features.SignIn
 
             // Create and save session
             Result<Session> session = await _sessionService.CreateSessionAsync(sessionInput);
-            if (!session.IsSuccess || session.Value is null)
+            if (session.IsSuccess is false || session.Value is null)
             {
                 _logger.SignInSessionCreationFailed(user.Id);
                 return Result<SignInResult>.Failure(AuthErrors.System.FailedToCreateSession, "Failed to create session. Please try again later.");

@@ -32,7 +32,7 @@ namespace Aegis.Auth.Extensions
       services.AddScoped(sp =>
       {
         IHostEnvironment env = sp.GetRequiredService<IHostEnvironment>();
-        return new AegisCookieManager(options, env.IsDevelopment());
+        return new SessionCookieHandler(options, env.IsDevelopment());
       });
 
       // Map the user's specific DB to your interface

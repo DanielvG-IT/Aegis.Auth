@@ -6,7 +6,6 @@ using Aegis.Auth.Entities;
 using Aegis.Auth.Logging;
 using Aegis.Auth.Options;
 
-using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 
@@ -24,11 +23,15 @@ namespace Aegis.Auth.Features.Sessions
     private readonly IAuthDbContext _db = dbContext;
     private readonly ILogger _logger = loggerFactory.CreateLogger<SessionService>();
 
+    private const int DefaultSessionExpiration = 604800; // 7 days in seconds (60 * 60 * 24 * 7)
+
     public async Task<Result<Session>> CreateSessionAsync(SessionCreateInput input)
     {
       _logger.SessionCreating(input.User.Id);
-      var sessionExpiration = _options.Session.ExpiresIn != 0 ? _options.Session.ExpiresIn : 60 * 60 * 24 * 7; // 7 days in seconds
-      DateTime now = DateTime.UtcNow;
+
+      var sessionExpiration = _options.Session.ExpiresIn is not 0 ? _options.Session.ExpiresIn : DefaultSessionExpiration;
+
+      var now = DateTime.UtcNow;
       var nowUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
       var data = new Session
@@ -56,14 +59,14 @@ namespace Aegis.Auth.Features.Sessions
         var currentListJson = await _cache.GetStringAsync(registryKey);
 
         List<SessionReference> list = [];
-        if (!string.IsNullOrWhiteSpace(currentListJson))
+        if (string.IsNullOrWhiteSpace(currentListJson) is false)
         {
           // Deserialize from cache
-          var cachedList = JsonSerializer.Deserialize<List<SessionReference>>(currentListJson);
+          List<SessionReference>? cachedList = JsonSerializer.Deserialize<List<SessionReference>>(currentListJson);
           if (cachedList is not null)
           {
             // Filter: remove expired and duplicates (in-place to avoid extra allocation)
-            list = cachedList.Where(s => s.ExpiresAt > nowUnixMs && s.Token != data.Token).ToList();
+            list = [.. cachedList.Where(s => s.ExpiresAt > nowUnixMs && s.Token != data.Token)];
           }
         }
 

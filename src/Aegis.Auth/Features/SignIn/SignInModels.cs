@@ -7,18 +7,14 @@ namespace Aegis.Auth.Features.SignIn
 {
     public class SignInEmailRequest
     {
-        public string Email { get; init; } = string.Empty;
-        public string Password { get; init; } = string.Empty;
-        public string? Callback { get; init; } = null;
-        public bool RememberMe { get; init; } = false;
-    }
-
-    public class SignInEmailInput
-    {
         public required string Email { get; init; }
         public required string Password { get; init; }
-        public bool RememberMe { get; init; } = false;
         public string? Callback { get; init; }
+        public bool RememberMe { get; init; } = true;
+    }
+
+    public class SignInEmailInput : SignInEmailRequest
+    {
         public required string UserAgent { get; init; }
         public required string IpAddress { get; init; }
     }
@@ -37,6 +33,6 @@ namespace Aegis.Auth.Features.SignIn
         public bool Redirect { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public string? Url { get; set; } = null;
+        public string? Url { get; set; }
     }
 }

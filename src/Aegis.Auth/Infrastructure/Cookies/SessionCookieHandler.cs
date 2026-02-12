@@ -12,7 +12,7 @@ using Microsoft.AspNetCore.Authentication;
 
 namespace Aegis.Auth.Infrastructure.Cookies
 {
-    public sealed class AegisCookieManager(AegisAuthOptions options, bool isDevelopment = false)
+    public sealed class SessionCookieHandler(AegisAuthOptions options, bool isDevelopment = false)
     {
         private readonly AegisAuthOptions _options = options;
         private readonly bool _isDevelopment = isDevelopment;
@@ -34,7 +34,7 @@ namespace Aegis.Auth.Infrastructure.Cookies
             };
             context.Response.Cookies.Append(sessionCookieName, signedToken, sessionOptions);
 
-            if (!rememberMe)
+            if (rememberMe is false)
             {
                 var drOptions = new CookieOptions
                 {
@@ -55,7 +55,7 @@ namespace Aegis.Auth.Infrastructure.Cookies
 
         public void SetCookieCache(HttpContext context, Session session, User user, bool rememberMe)
         {
-            if (!_options.Session.CookieCache?.Enabled ?? false) return;
+            if (_options.Session.CookieCache?.Enabled is false) return;
 
             var sessionPayload = new SessionCacheDto
             {
@@ -69,7 +69,6 @@ namespace Aegis.Auth.Infrastructure.Cookies
             };
 
             DateTimeOffset cacheExpiry = DateTimeOffset.UtcNow.AddSeconds(_options.Session.CookieCache?.MaxAge ?? 300);
-
             var payloadJson = JsonSerializer.Serialize(sessionPayload);
             var signature = AegisSigner.GenerateSignature(payloadJson, _options.Secret);
 
