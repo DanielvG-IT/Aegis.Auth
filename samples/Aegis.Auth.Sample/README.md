@@ -56,6 +56,21 @@ Content-Type: application/json
 }
 ```
 
+### Sign Up
+
+```http
+POST /api/auth/sign-up/email
+Content-Type: application/json
+
+{
+  "name": "New Sample User",
+  "email": "new-user@example.com",
+  "password": "Password123!",
+  "image": "https://example.com/avatar.png",
+  "callback": null
+}
+```
+
 ## Testing with curl
 
 ### Health Check
@@ -79,6 +94,24 @@ curl -X POST http://localhost:5000/api/auth/sign-in/email \
 ```
 
 The `-c cookies.txt` flag saves the session cookies to a file, and `-v` shows verbose output including headers.
+
+### Sign Up
+
+```bash
+curl -X POST http://localhost:5000/api/auth/sign-up/email \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "New Sample User",
+    "email": "new-user@example.com",
+    "password": "Password123!",
+    "image": "https://example.com/avatar.png",
+    "callback": null
+  }' \
+  -c cookies.txt \
+  -v
+```
+
+Use a unique email if you run the same request more than once without resetting the in-memory database.
 
 ## Configuration
 

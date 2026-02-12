@@ -3,6 +3,7 @@
 
 @baseUrl = http://localhost:5000
 @contentType = application/json
+@newUserEmail = new-user-{{$timestamp}}@example.com
 
 ### Health Check - Get API status and configuration
 GET {{baseUrl}}/api/health
@@ -11,6 +12,34 @@ Accept: application/json
 ### Get all users in database
 GET {{baseUrl}}/api/health/users
 Accept: application/json
+
+###
+
+### Sign Up - Create a new user (email uses timestamp to avoid duplicate conflicts)
+POST {{baseUrl}}/api/auth/sign-up/email
+Content-Type: {{contentType}}
+
+{
+  "name": "New Sample User",
+  "email": "{{newUserEmail}}",
+  "password": "Password123!",
+  "image": "https://example.com/avatar.png",
+  "callback": null
+}
+
+###
+
+### Sign Up - Duplicate email (should fail if run after request above)
+POST {{baseUrl}}/api/auth/sign-up/email
+Content-Type: {{contentType}}
+
+{
+  "name": "New Sample User",
+  "email": "{{newUserEmail}}",
+  "password": "Password123!",
+  "image": null,
+  "callback": null
+}
 
 ###
 
