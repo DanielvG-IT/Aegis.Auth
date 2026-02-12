@@ -12,13 +12,13 @@ namespace Aegis.Auth.Features.Sessions
 
     internal record SessionReference
     {
-        public string Token { get; set; } = string.Empty; // The "Key" to the full cache
-        public long ExpiresAt { get; set; } // When THIS specific session dies
+        public string Token { get; init; } = string.Empty; // The "Key" to the full cache
+        public long ExpiresAt { get; init; } // When THIS specific session dies
     }
 
     public record SessionCacheJson
     {
-        public required Session Session { get; set; }
-        public required User User { get; set; }
+        public required Session Session { get; init; }
+        public required User User { get; init; }
     }
 }

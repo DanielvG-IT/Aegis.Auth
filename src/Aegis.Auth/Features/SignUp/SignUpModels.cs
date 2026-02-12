@@ -29,11 +29,11 @@ namespace Aegis.Auth.Features.SignUp
 
     public class SignUpResponse
     {
-        public required UserDto User { get; set; }
-        public string? Token { get; set; }
-        public bool Redirect { get; set; }
+        public required UserDto User { get; init; }
+        public string? Token { get; init; }
+        public bool Redirect { get; init; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public string? Url { get; set; }
+        public string? Url { get; init; }
     }
 }

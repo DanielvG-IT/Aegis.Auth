@@ -52,7 +52,7 @@ namespace Aegis.Auth.Options
 
     public sealed class PasswordValidateContext
     {
-        public required string Password { get; set; }
+        public required string Password { get; init; }
     }
 
     public sealed class PasswordValidationResult

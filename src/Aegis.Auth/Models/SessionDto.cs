@@ -2,31 +2,31 @@ namespace Aegis.Auth.Models
 {
     public class SessionCachePayload
     {
-        public required long ExpiresAt { get; set; }
-        public required string Signature { get; set; }
-        public required SessionCacheDto Session { get; set; }
+        public required long ExpiresAt { get; init; }
+        public required string Signature { get; init; }
+        public required SessionCacheDto Session { get; init; }
     }
     public class SessionCacheDto
     {
-        public required SessionCacheMetadata Session { get; set; }
-        public required long UpdatedAt { get; set; }
-        public string Version { get; set; } = "1";
+        public required SessionCacheMetadata Session { get; init; }
+        public required long UpdatedAt { get; init; }
+        public string Version { get; init; } = "1";
     }
     public class SessionCacheMetadata
     {
-        public required UserDto User { get; set; }
-        public required SessionDto Session { get; set; }
+        public required UserDto User { get; init; }
+        public required SessionDto Session { get; init; }
     }
 
     public class SessionDto
     {
-        public required string Id { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public required string Token { get; set; }
-        public required string UserId { get; set; }
-        public DateTime ExpiresAt { get; set; }
-        public required string IpAddress { get; set; }
-        public required string UserAgent { get; set; }
+        public required string Id { get; init; }
+        public DateTime CreatedAt { get; init; }
+        public DateTime UpdatedAt { get; init; }
+        public required string Token { get; init; }
+        public required string UserId { get; init; }
+        public DateTime ExpiresAt { get; init; }
+        public required string IpAddress { get; init; }
+        public required string UserAgent { get; init; }
     }
 }
