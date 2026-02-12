@@ -10,7 +10,6 @@ using Aegis.Auth.Infrastructure.Cookies;
 
 using Aegis.Auth.Abstractions;
 using Aegis.Auth.Options;
-using Aegis.Auth.Logging;
 
 namespace Aegis.Auth.Extensions
 {
@@ -25,7 +24,6 @@ namespace Aegis.Auth.Extensions
       configure?.Invoke(options);
 
       services.AddSingleton(options);
-      services.TryAddSingleton<IAegisLogger, AegisLogger>();
 
       // Add a memory cache to mock distributed cache
       services.AddDistributedMemoryCache();

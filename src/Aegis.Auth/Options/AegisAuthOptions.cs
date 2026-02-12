@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Logging;
 
 namespace Aegis.Auth.Options
 {
@@ -9,7 +8,6 @@ namespace Aegis.Auth.Options
         public string BaseURL { get; set; } = string.Empty;
         public string Secret { get; set; } = string.Empty;
         public ICollection<string>? TrustedOrigins { get; set; }
-        public LogLevel LogLevel { get; set; } = LogLevel.Warning;
 
         public IDistributedCache? SecondaryStorage { get; set; }
 

@@ -3,10 +3,12 @@ using System.Text.Json;
 using Aegis.Auth.Abstractions;
 using Aegis.Auth.Core.Crypto;
 using Aegis.Auth.Entities;
+using Aegis.Auth.Logging;
 using Aegis.Auth.Options;
 
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Logging;
 
 namespace Aegis.Auth.Features.Sessions
 {
@@ -15,16 +17,18 @@ namespace Aegis.Auth.Features.Sessions
     Task<Result<Session>> CreateSessionAsync(SessionCreateInput input);
   }
 
-  internal sealed class SessionService(AegisAuthOptions options, IAuthDbContext dbContext, IDistributedCache disCache) : ISessionService
+  internal sealed class SessionService(AegisAuthOptions options, ILoggerFactory loggerFactory, IAuthDbContext dbContext, IDistributedCache disCache) : ISessionService
   {
     private readonly AegisAuthOptions _options = options;
     private readonly IDistributedCache _cache = disCache;
     private readonly IAuthDbContext _db = dbContext;
+    private readonly ILogger _logger = loggerFactory.CreateLogger<SessionService>();
 
     public async Task<Result<Session>> CreateSessionAsync(SessionCreateInput input)
     {
+      _logger.SessionCreating(input.User.Id);
       var sessionExpiration = _options.Session.ExpiresIn != 0 ? _options.Session.ExpiresIn : 60 * 60 * 24 * 7; // 7 days in seconds
-      var now = DateTime.UtcNow;
+      DateTime now = DateTime.UtcNow;
       var nowUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
       var data = new Session
@@ -93,9 +97,18 @@ namespace Aegis.Auth.Features.Sessions
       if (_options.Session.StoreSessionInDatabase || _options.SecondaryStorage is null)
       {
         _db.Sessions.Add(data);
-        await _db.SaveChangesAsync();
+        try
+        {
+          await _db.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+          _logger.SessionCreationFailed(input.User.Id, ex);
+          return Result<Session>.Failure(Constants.AuthErrors.System.InternalError, "Failed to save session.");
+        }
       }
 
+      _logger.SessionCreated(data.Id, input.User.Id);
       return data;
     }
   }

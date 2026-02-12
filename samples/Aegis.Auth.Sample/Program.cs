@@ -18,7 +18,6 @@ builder.Services.AddAegisAuth<SampleAuthDbContext>(options =>
     options.AppName = "AegisAuthSample";
     options.BaseURL = "http://localhost:5000";
     options.Secret = "your-super-secret-key-minimum-32-characters-long!!!";
-    options.LogLevel = Microsoft.Extensions.Logging.LogLevel.Debug;
 
     // Enable email/password authentication
     options.EmailAndPassword.Enabled = true;
