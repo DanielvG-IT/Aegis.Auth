@@ -1,5 +1,5 @@
-using Aegis.Auth.Extensions;
 using Aegis.Auth.Options;
+using Aegis.Auth.Extensions;
 using Aegis.Auth.Sample.Data;
 
 using Microsoft.EntityFrameworkCore;
@@ -21,11 +21,10 @@ builder.Services.AddAegisAuth<SampleAuthDbContext>(options =>
 
     // Enable email/password authentication
     options.EmailAndPassword.Enabled = true;
-    // Note: Email verification is disabled in v0.1 (will be available in v0.2)
 
     // Configure session
     options.Session.ExpiresIn = 3600; // 1 hour
-    options.Session.CookieCache = new Aegis.Auth.Options.CookieCacheOptions
+    options.Session.CookieCache = new CookieCacheOptions
     {
         Enabled = true,
         MaxAge = 300 // 5 minutes

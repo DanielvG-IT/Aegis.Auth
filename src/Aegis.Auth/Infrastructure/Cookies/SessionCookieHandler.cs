@@ -57,6 +57,8 @@ namespace Aegis.Auth.Infrastructure.Cookies
         {
             if (_options.Session.CookieCache?.Enabled is false) return;
 
+            var sessionDataCookieName = _isDevelopment ? "aegis.session_data" : "__Host-aegis.session_data";
+
             var sessionPayload = new SessionCacheDto
             {
                 Session = new()
@@ -81,7 +83,7 @@ namespace Aegis.Auth.Infrastructure.Cookies
 
             var finalJson = JsonSerializer.Serialize(finalEnvelope);
             var encodedData = Base64UrlTextEncoder.Encode(Encoding.UTF8.GetBytes(finalJson));
-            context.Response.Cookies.Append("__Host-aegis.session_data", encodedData, new CookieOptions
+            context.Response.Cookies.Append(sessionDataCookieName, encodedData, new CookieOptions
             {
                 HttpOnly = true,
                 Secure = !_isDevelopment,
