@@ -34,12 +34,35 @@ namespace Aegis.Auth.Options
 
         public Func<PasswordVerifyContext, Task<bool>> Verify { get; set; } =
             ctx => Task.FromResult(BCrypt.Net.BCrypt.EnhancedVerify(ctx.Password, ctx.Hash));
+
+        /// <summary>
+        /// Custom password validation function for enforcing password requirements.
+        /// Receives a PasswordValidateContext with the new password and optionally the old password.
+        /// Return a PasswordValidationResult with success=true if valid, or success=false with error details if invalid.
+        /// Use this to implement custom validation rules required by laws, business logic, etc.
+        /// </summary>
+        public Func<PasswordValidateContext, Task<PasswordValidationResult>>? Validate { get; set; }
     }
 
     public sealed class PasswordVerifyContext
     {
         public required string Hash { get; init; }
         public required string Password { get; init; }
+    }
+
+    public sealed class PasswordValidateContext
+    {
+        public required string Password { get; set; }
+    }
+
+    public sealed class PasswordValidationResult
+    {
+        public bool IsValid { get; internal set; }
+        public string? ErrorMessage { get; internal set; }
+
+        public static PasswordValidationResult Valid() => new() { IsValid = true };
+        public static PasswordValidationResult Invalid(string errorMessage) =>
+            new() { IsValid = false, ErrorMessage = errorMessage };
     }
 
     // public sealed class ResetPasswordContext

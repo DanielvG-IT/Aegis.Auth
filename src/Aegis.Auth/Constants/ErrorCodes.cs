@@ -17,7 +17,8 @@ namespace Aegis.Auth.Constants
     {
       public const string InvalidInput = "INVALID_INPUT";
       public const string EmailRequired = "EMAIL_REQUIRED";
-      public const string PasswordTooWeak = "PASSWORD_TOO_WEAK";
+      public const string PasswordTooShort = "PASSWORD_TOO_SHORT";
+      public const string PasswordTooLong = "PASSWORD_TOO_LONG";
     }
 
     // 🔐 Identity & Access
