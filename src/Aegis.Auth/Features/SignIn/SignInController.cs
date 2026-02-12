@@ -11,6 +11,8 @@ namespace Aegis.Auth.Features.SignIn
     [Route("api/auth")]
     public sealed class SignInController(ISignInService signInService, SessionCookieHandler cookieManager) : AegisControllerBase
     {
+        private readonly SessionCookieHandler _cookieManager = cookieManager;
+
         [HttpPost("sign-in/email")]
         public async Task<IActionResult> SignInEmail([FromBody] SignInEmailRequest request)
         {
@@ -31,7 +33,7 @@ namespace Aegis.Auth.Features.SignIn
 
             SignInResult data = result.Value;
 
-            cookieManager.SetSessionCookie(HttpContext, data.Session, data.User, request.RememberMe);
+            _cookieManager.SetSessionCookie(HttpContext, data.Session, data.User, request.RememberMe);
 
             var shouldRedirect = string.IsNullOrWhiteSpace(request.Callback) is false;
             if (shouldRedirect)
