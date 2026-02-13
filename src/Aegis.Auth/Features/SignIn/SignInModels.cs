@@ -23,14 +23,14 @@ namespace Aegis.Auth.Features.SignIn
     {
         public required User User { get; init; } // The Entity
         public required Session Session { get; init; } // The Entity
-        public string? CallbackUrl { get; init; }
+        public required string? CallbackUrl { get; init; }
     }
 
     public class SignInResponse
     {
         public required UserDto User { get; init; }
         public required string Token { get; init; }
-        public bool Redirect { get; init; }
+        public required bool Redirect { get; init; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Url { get; init; }

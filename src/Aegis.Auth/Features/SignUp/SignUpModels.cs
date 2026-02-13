@@ -23,15 +23,15 @@ namespace Aegis.Auth.Features.SignUp
     public class SignUpResult
     {
         public required User User { get; init; }
-        public Session? Session { get; init; }
-        public string? CallbackUrl { get; init; }
+        public required Session? Session { get; init; }
+        public required string? CallbackUrl { get; init; }
     }
 
     public class SignUpResponse
     {
         public required UserDto User { get; init; }
-        public string? Token { get; init; }
-        public bool Redirect { get; init; }
+        public required string? Token { get; init; }
+        public required bool Redirect { get; init; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Url { get; init; }
