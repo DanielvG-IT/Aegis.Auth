@@ -7,7 +7,7 @@ namespace Aegis.Auth
         public string? ErrorCode { get; }
         public string? Message { get; }
 
-        protected Result(bool success, string? errorCode, string? message)
+        private Result(bool success, string? errorCode, string? message)
         {
             IsSuccess = success;
             ErrorCode = errorCode;
