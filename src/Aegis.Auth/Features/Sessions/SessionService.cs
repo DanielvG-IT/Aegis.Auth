@@ -96,9 +96,13 @@ namespace Aegis.Auth.Features.Sessions
           }
         }
 
-        // 2. Add new session and Sort to find the furthest expiry
-        list.Add(new SessionReference { Token = data.Token, ExpiresAt = new DateTimeOffset(data.ExpiresAt).ToUnixTimeMilliseconds() });
-        list.Sort((a, b) => a.ExpiresAt.CompareTo(b.ExpiresAt)); // In-place sort, more efficient
+        // 2. Add new session only if not already expired (guard against clock skew/edge cases)
+        var sessionExpiryUnixMs = new DateTimeOffset(data.ExpiresAt).ToUnixTimeMilliseconds();
+        if (sessionExpiryUnixMs > nowUnixMs)
+        {
+          list.Add(new SessionReference { Token = data.Token, ExpiresAt = sessionExpiryUnixMs });
+          list.Sort((a, b) => a.ExpiresAt.CompareTo(b.ExpiresAt)); // In-place sort, more efficient
+        }
 
         // 3. Calculate TTL for the Registry (round up to prevent premature expiration)
         var furthestSessionExp = list.LastOrDefault()?.ExpiresAt ?? nowUnixMs;
@@ -109,8 +113,8 @@ namespace Aegis.Auth.Features.Sessions
           await _cache.SetStringAsync(registryKey, JsonSerializer.Serialize(list), new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(furthestSessionTTL) });
         }
 
-        // 4. Cache the Full Session + User Data (round up to prevent premature expiration)
-        var sessionTTL = (long)Math.Ceiling((new DateTimeOffset(data.ExpiresAt).ToUnixTimeMilliseconds() - nowUnixMs) / 1000.0);
+        // 4. Cache the Full Session + User Data (reuse sessionExpiryUnixMs from above)
+        var sessionTTL = (long)Math.Ceiling((sessionExpiryUnixMs - nowUnixMs) / 1000.0);
         if (sessionTTL > 0)
         {
           var sessionCacheData = JsonSerializer.Serialize(new SessionCacheJson { Session = data, User = input.User });
