@@ -12,12 +12,16 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<SampleAuthDbContext>(options =>
     options.UseInMemoryDatabase("AegisAuthTestDb"));
 
+
+// Add a memory cache to mock distributed cache
+builder.Services.AddDistributedMemoryCache();
+
 // Configure Aegis Auth
 builder.Services.AddAegisAuth<SampleAuthDbContext>(options =>
 {
     options.AppName = "AegisAuthSample";
     options.BaseURL = "http://localhost:5000";
-    options.Secret = "your-super-secret-key-minimum-32-characters-long!!!";
+    options.Secret = "load-this-secret-from-secure-place-like-environment-variables"; // Must be 32 chars or longer
 
     // Enable email/password authentication
     options.EmailAndPassword.Enabled = true;

@@ -14,16 +14,19 @@ namespace Aegis.Auth.Features.Sessions
   public interface ISessionService
   {
     Task<Result<Session>> CreateSessionAsync(SessionCreateInput input);
+    Task<Result> RevokeSessionAsync(SessionDeleteInput input);
+    Task<Result> RevokeAllSessionsAsync(string userId);
   }
 
-  internal sealed class SessionService(AegisAuthOptions options, ILoggerFactory loggerFactory, IAuthDbContext dbContext, IDistributedCache disCache) : ISessionService
+  internal sealed class SessionService(AegisAuthOptions options, ILoggerFactory loggerFactory, IAuthDbContext dbContext, IDistributedCache? disCache) : ISessionService
   {
     private readonly AegisAuthOptions _options = options;
-    private readonly IDistributedCache _cache = disCache;
+    private readonly IDistributedCache? _cache = disCache;
     private readonly IAuthDbContext _db = dbContext;
     private readonly ILogger _logger = loggerFactory.CreateLogger<SessionService>();
 
     private const int DefaultSessionExpiration = 604800; // 7 days in seconds (60 * 60 * 24 * 7)
+    private const string RegistryKeyPrefix = "active-sessions-";
 
     public async Task<Result<Session>> CreateSessionAsync(SessionCreateInput input)
     {
@@ -52,10 +55,10 @@ namespace Aegis.Auth.Features.Sessions
       };
 
       // Always store in SecondaryStorage when available, 
-      if (_options.SecondaryStorage is not null)
+      if (_cache is not null)
       {
         // 1. Fetch the current session list for the user
-        var registryKey = $"active-sessions-{input.User.Id}";
+        var registryKey = RegistryKeyPrefix + input.User.Id;
         var currentListJson = await _cache.GetStringAsync(registryKey);
 
         List<SessionReference> list = [];
@@ -97,7 +100,7 @@ namespace Aegis.Auth.Features.Sessions
       }
 
       // if enabled or no SecondaryStorage (also) store in DB 
-      if (_options.Session.StoreSessionInDatabase || _options.SecondaryStorage is null)
+      if (_options.Session.StoreSessionInDatabase || _cache is null)
       {
         _db.Sessions.Add(data);
         try
@@ -113,6 +116,33 @@ namespace Aegis.Auth.Features.Sessions
 
       _logger.SessionCreated(data.Id, input.User.Id);
       return data;
+    }
+
+    // After you remove a token from the list, check if the list is count == 0. 
+    // If so, Remove the key instead of Set an empty array. Redis loves it when you delete keys; 
+    // + it keeps the memory footprint tiny.
+
+    /*
+      Cache First: Kill the session in Redis. This immediately "de-authenticates" the user for any incoming requests hitting the middleware.
+      Cookie Second: Tell the browser to nuke the cookie. TODO: Dont know how though
+      Registry/DB Last: These are for "record keeping." If these fail, the user is still functionally logged out because the Cache and Cookie are gone.
+    */
+    /*
+      Can you implement the Registry cleanup so that it recalculates the TTL of the Registry key based on the next expiring session? 
+      If Session A expires in 1 hour and Session B in 7 days, and you delete Session B, the Redis Registry key for that user should automatically have its TTL reduced to 1 hour. 
+    */
+    public Task<Result> RevokeSessionAsync(SessionDeleteInput input)
+    {
+      var registryKey = RegistryKeyPrefix + input.User.Id;
+      throw new NotImplementedException();
+      // Result.Success()
+    }
+
+    public async Task<Result> RevokeAllSessionsAsync(string userId)
+    {
+      var registryKey = RegistryKeyPrefix + userId;
+      throw new NotImplementedException();
+      // Result.Success()
     }
   }
 }

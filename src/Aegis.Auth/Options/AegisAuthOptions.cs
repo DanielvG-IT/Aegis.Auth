@@ -9,8 +9,6 @@ namespace Aegis.Auth.Options
         public string Secret { get; set; } = string.Empty;
         public ICollection<string>? TrustedOrigins { get; set; }
 
-        public IDistributedCache? SecondaryStorage { get; set; }
-
         public EmailAndPasswordOptions EmailAndPassword { get; set; } = new();
 
         // ═══════════════════════════════════════════════════════════════════════════════

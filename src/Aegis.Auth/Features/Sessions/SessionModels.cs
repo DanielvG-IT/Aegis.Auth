@@ -10,6 +10,13 @@ namespace Aegis.Auth.Features.Sessions
         public required string IpAddress { get; init; }
     }
 
+    public class SessionDeleteInput
+    {
+        public required User User { get; init; }
+        public required string UserAgent { get; init; }
+        public required string IpAddress { get; init; }
+    }
+
     internal record SessionReference
     {
         public string Token { get; init; } = string.Empty; // The "Key" to the full cache

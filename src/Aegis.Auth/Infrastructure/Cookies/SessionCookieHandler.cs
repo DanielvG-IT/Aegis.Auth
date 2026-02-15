@@ -17,9 +17,20 @@ namespace Aegis.Auth.Infrastructure.Cookies
         private readonly AegisAuthOptions _options = options;
         private readonly bool _isDevelopment = isDevelopment;
 
+        // TODO Cookie roadmap (better-auth parity, .NET-idiomatic):
+        // [ ] Replace direct options object usage with IOptions/IOptionsSnapshot in DI registration
+        // [ ] Add per-cookie config models (session_token, session_data, dont_remember)
+        // [ ] Support per-cookie + default attribute overrides from configuration
+        // [ ] Add secure prefix strategy (__Host-/__Secure-) and configurable cookie prefix
+        // [ ] Add optional cross-subdomain domain support
+        // [ ] Add chunking for oversized session_data cookies (>4093 bytes)
+        // [ ] Add cookie read/verify helpers (session token + session cache)
+        // [ ] Add delete/expire flow including chunk cleanup + dont_remember cleanup
+        // [ ] Align remember-me behavior between sign-in and sign-up flows
+        // [ ] Migrate signing/encryption to ASP.NET Core Data Protection
+
         public void SetSessionCookie(HttpContext context, Session session, User user, bool rememberMe)
         {
-            // TODO Possibly custom cookienames like $"__Host-{_options.AppName}.session"
             var sessionCookieName = _isDevelopment ? "aegis.session" : "__Host-aegis.session";
             var dontRememberCookieName = _isDevelopment ? "aegis.dont_remember" : "__Host-aegis.dont_remember";
 
