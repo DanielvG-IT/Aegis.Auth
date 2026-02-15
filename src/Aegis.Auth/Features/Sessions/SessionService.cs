@@ -71,49 +71,71 @@ namespace Aegis.Auth.Features.Sessions
       }
 
       // Cache the session only after DB persistence succeeds
-      // NOTE: There is a known race condition in the registry update when multiple concurrent
-      // session creations occur for the same user. The window between GetStringAsync and 
-      // SetStringAsync allows another request to overwrite registry entries, potentially losing
-      // session references. This impacts RevokeAllSessionsAsync which may miss sessions not in
-      // the registry. Individual session tokens remain cached and functional.
-      // Mitigation options: distributed locks (Redis WATCH/MULTI, RedLock), optimistic retry,
-      // or accepting eventual consistency. For most use cases, this degradation is acceptable.
+      // Use optimistic retry to mitigate race conditions in registry updates
       if (_cache is not null)
       {
-        // 1. Fetch the current session list for the user
         var registryKey = RegistryKeyPrefix + input.User.Id;
-        var currentListJson = await _cache.GetStringAsync(registryKey);
+        var sessionExpiryUnixMs = new DateTimeOffset(data.ExpiresAt).ToUnixTimeMilliseconds();
 
-        List<SessionReference> list = [];
-        if (string.IsNullOrWhiteSpace(currentListJson) is false)
+        // Skip registry if session is already expired
+        if (sessionExpiryUnixMs > nowUnixMs)
         {
-          // Deserialize from cache
-          List<SessionReference>? cachedList = JsonSerializer.Deserialize<List<SessionReference>>(currentListJson);
-          if (cachedList is not null)
+          const int maxRetries = 3;
+          var registryUpdated = false;
+
+          for (var attempt = 0; attempt < maxRetries && !registryUpdated; attempt++)
           {
-            // Filter: remove expired and duplicates (in-place to avoid extra allocation)
-            list = [.. cachedList.Where(s => s.ExpiresAt > nowUnixMs && s.Token != data.Token)];
+            // 1. Fetch the current session list for the user
+            var currentListJson = await _cache.GetStringAsync(registryKey);
+
+            List<SessionReference> list = [];
+            if (string.IsNullOrWhiteSpace(currentListJson) is false)
+            {
+              List<SessionReference>? cachedList = JsonSerializer.Deserialize<List<SessionReference>>(currentListJson);
+              if (cachedList is not null)
+              {
+                // Filter: remove expired and duplicates
+                list = [.. cachedList.Where(s => s.ExpiresAt > nowUnixMs && s.Token != data.Token)];
+              }
+            }
+
+            // 2. Add new session and sort
+            list.Add(new SessionReference { Token = data.Token, ExpiresAt = sessionExpiryUnixMs });
+            list.Sort((a, b) => a.ExpiresAt.CompareTo(b.ExpiresAt));
+
+            // 3. Calculate TTL for the Registry (round up to prevent premature expiration)
+            var furthestSessionExp = list.LastOrDefault()?.ExpiresAt ?? nowUnixMs;
+            var furthestSessionTTL = (long)Math.Ceiling((furthestSessionExp - nowUnixMs) / 1000.0);
+
+            if (furthestSessionTTL > 0)
+            {
+              await _cache.SetStringAsync(registryKey, JsonSerializer.Serialize(list), new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(furthestSessionTTL) });
+
+              // 4. Verify the registry update succeeded (optimistic check)
+              var verifyJson = await _cache.GetStringAsync(registryKey);
+              if (!string.IsNullOrWhiteSpace(verifyJson))
+              {
+                var verifyList = JsonSerializer.Deserialize<List<SessionReference>>(verifyJson);
+                if (verifyList?.Any(s => s.Token == data.Token) == true)
+                {
+                  registryUpdated = true;
+                }
+              }
+            }
+            else
+            {
+              // No valid TTL, don't retry
+              break;
+            }
+          }
+
+          if (!registryUpdated)
+          {
+            _logger.LogWarning("Failed to update session registry for user {UserId} after {MaxRetries} attempts. Session {SessionId} will function but may not appear in RevokeAllSessionsAsync.", input.User.Id, maxRetries, data.Id);
           }
         }
 
-        // 2. Add new session only if not already expired (guard against clock skew/edge cases)
-        var sessionExpiryUnixMs = new DateTimeOffset(data.ExpiresAt).ToUnixTimeMilliseconds();
-        if (sessionExpiryUnixMs > nowUnixMs)
-        {
-          list.Add(new SessionReference { Token = data.Token, ExpiresAt = sessionExpiryUnixMs });
-          list.Sort((a, b) => a.ExpiresAt.CompareTo(b.ExpiresAt)); // In-place sort, more efficient
-        }
-
-        // 3. Calculate TTL for the Registry (round up to prevent premature expiration)
-        var furthestSessionExp = list.LastOrDefault()?.ExpiresAt ?? nowUnixMs;
-        var furthestSessionTTL = (long)Math.Ceiling((furthestSessionExp - nowUnixMs) / 1000.0);
-
-        if (furthestSessionTTL > 0)
-        {
-          await _cache.SetStringAsync(registryKey, JsonSerializer.Serialize(list), new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(furthestSessionTTL) });
-        }
-
-        // 4. Cache the Full Session + User Data (reuse sessionExpiryUnixMs from above)
+        // 5. Cache the Full Session + User Data (always attempt, independent of registry)
         var sessionTTL = (long)Math.Ceiling((sessionExpiryUnixMs - nowUnixMs) / 1000.0);
         if (sessionTTL > 0)
         {
