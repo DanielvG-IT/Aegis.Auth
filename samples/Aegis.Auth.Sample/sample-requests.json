@@ -1,0 +1,84 @@
+{
+    "signUpEmail": {
+        "description": "Sign up with email and password (replace with a unique email each run)",
+        "endpoint": "POST /api/auth/sign-up/email",
+        "request": {
+            "name": "New Sample User",
+            "email": "new-user@example.com",
+            "password": "Password123!",
+            "image": "https://example.com/avatar.png",
+            "callback": null
+        }
+    },
+    "signUpDuplicateEmail": {
+        "description": "Test duplicate email signup (should fail)",
+        "endpoint": "POST /api/auth/sign-up/email",
+        "request": {
+            "name": "New Sample User",
+            "email": "new-user@example.com",
+            "password": "Password123!",
+            "image": null,
+            "callback": null
+        }
+    },
+    "signInEmail": {
+        "description": "Sign in with email and password - Remember me enabled",
+        "endpoint": "POST /api/auth/sign-in/email",
+        "request": {
+            "email": "test@example.com",
+            "password": "Password123!",
+            "rememberMe": true,
+            "callback": null
+        }
+    },
+    "signInEmailNoRemember": {
+        "description": "Sign in with email and password - Session cookie only",
+        "endpoint": "POST /api/auth/sign-in/email",
+        "request": {
+            "email": "test@example.com",
+            "password": "Password123!",
+            "rememberMe": false,
+            "callback": null
+        }
+    },
+    "signInEmailWithCallback": {
+        "description": "Sign in with redirect callback URL",
+        "endpoint": "POST /api/auth/sign-in/email",
+        "request": {
+            "email": "test@example.com",
+            "password": "Password123!",
+            "rememberMe": true,
+            "callback": "https://example.com/dashboard"
+        }
+    },
+    "signInInvalidEmail": {
+        "description": "Test invalid email format",
+        "endpoint": "POST /api/auth/sign-in/email",
+        "request": {
+            "email": "not-an-email",
+            "password": "Password123!",
+            "rememberMe": false,
+            "callback": null
+        }
+    },
+    "signInWrongPassword": {
+        "description": "Test wrong password",
+        "endpoint": "POST /api/auth/sign-in/email",
+        "request": {
+            "email": "test@example.com",
+            "password": "WrongPassword123!",
+            "rememberMe": false,
+            "callback": null
+        }
+    },
+    "signInNonexistentUser": {
+        "description": "Test non-existent user",
+        "endpoint": "POST /api/auth/sign-in/email",
+        "request": {
+            "email": "nonexistent@example.com",
+            "password": "Password123!",
+            "rememberMe": false,
+            "callback": null
+        }
+    }
+}

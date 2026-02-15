@@ -1,0 +1,127 @@
+### Sample HTTP Requests for Aegis.Auth API
+### You can use this file with REST Client extension in VS Code or similar tools
+
+@baseUrl = http://localhost:5000
+@contentType = application/json
+@newUserEmail = new-user-{{$timestamp}}@example.com
+
+### Health Check - Get API status and configuration
+GET {{baseUrl}}/api/health
+Accept: application/json
+
+### Get all users in database
+GET {{baseUrl}}/api/health/users
+Accept: application/json
+
+###
+
+### Sign Up - Create a new user (email uses timestamp to avoid duplicate conflicts)
+POST {{baseUrl}}/api/auth/sign-up/email
+Content-Type: {{contentType}}
+
+{
+  "name": "New Sample User",
+  "email": "{{newUserEmail}}",
+  "password": "Password123!",
+  "image": "https://example.com/avatar.png",
+  "callback": null
+}
+
+###
+
+### Sign Up - Duplicate email (should fail if run after request above)
+POST {{baseUrl}}/api/auth/sign-up/email
+Content-Type: {{contentType}}
+
+{
+  "name": "New Sample User",
+  "email": "{{newUserEmail}}",
+  "password": "Password123!",
+  "image": null,
+  "callback": null
+}
+
+###
+
+### Sign In - Valid credentials with remember me
+POST {{baseUrl}}/api/auth/sign-in/email
+Content-Type: {{contentType}}
+
+{
+  "email": "test@example.com",
+  "password": "Password123!",
+  "rememberMe": true,
+  "callback": null
+}
+
+###
+
+### Sign In - Valid credentials without remember me
+POST {{baseUrl}}/api/auth/sign-in/email
+Content-Type: {{contentType}}
+
+{
+  "email": "test@example.com",
+  "password": "Password123!",
+  "rememberMe": false,
+  "callback": null
+}
+
+###
+
+### Sign In - With callback URL
+POST {{baseUrl}}/api/auth/sign-in/email
+Content-Type: {{contentType}}
+
+{
+  "email": "test@example.com",
+  "password": "Password123!",
+  "rememberMe": true,
+  "callback": "https://example.com/dashboard"
+}
+
+###
+
+### Sign In - Invalid email format (should fail)
+POST {{baseUrl}}/api/auth/sign-in/email
+Content-Type: {{contentType}}
+
+{
+  "email": "not-an-email",
+  "password": "Password123!",
+  "rememberMe": false,
+  "callback": null
+}
+
+###
+
+### Sign In - Wrong password (should fail)
+POST {{baseUrl}}/api/auth/sign-in/email
+Content-Type: {{contentType}}
+
+{
+  "email": "test@example.com",
+  "password": "WrongPassword123!",
+  "rememberMe": false,
+  "callback": null
+}
+
+###
+
+### Sign In - Non-existent user (should fail)
+POST {{baseUrl}}/api/auth/sign-in/email
+Content-Type: {{contentType}}
+
+{
+  "email": "nonexistent@example.com",
+  "password": "Password123!",
+  "rememberMe": false,
+  "callback": null
+}
+
+###
+
+### Sign Out - Sign out current user (run after signing in above)
+POST {{baseUrl}}/api/auth/sign-out
+
+###
