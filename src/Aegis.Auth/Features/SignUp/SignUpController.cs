@@ -1,6 +1,7 @@
 using Aegis.Auth.Extensions;
 using Aegis.Auth.Abstractions;
 using Aegis.Auth.Infrastructure.Cookies;
+using Aegis.Auth.Options;
 
 using Microsoft.AspNetCore.Mvc;
 
@@ -9,9 +10,10 @@ namespace Aegis.Auth.Features.SignUp
 
     [ApiController]
     [Route("api/auth")]
-    public sealed class SignUpController(ISignUpService signUpService, SessionCookieHandler cookieManager) : AegisControllerBase
+    public sealed class SignUpController(ISignUpService signUpService, SessionCookieHandler cookieManager, AegisAuthOptions options) : AegisControllerBase
     {
         private readonly SessionCookieHandler _cookieManager = cookieManager;
+        private readonly AegisAuthOptions _options = options;
 
         [HttpPost("sign-up/email")]
         public async Task<IActionResult> SignUpEmail([FromBody] SignUpEmailRequest request)
@@ -37,16 +39,17 @@ namespace Aegis.Auth.Features.SignUp
             if (data.Session is not null)
                 _cookieManager.SetSessionCookie(HttpContext, data.Session, data.User, false);
 
-            var shouldRedirect = string.IsNullOrWhiteSpace(request.Callback) is false;
+            var validatedCallback = ValidateCallback(request.Callback, _options);
+            var shouldRedirect = validatedCallback is not null;
             if (shouldRedirect)
-                HttpContext.Response.Headers.Location = request.Callback;
+                HttpContext.Response.Headers.Location = validatedCallback;
 
             return Ok(new SignUpResponse
             {
                 User = data.User.ToDto(),
                 Token = data.Session?.Token,
                 Redirect = shouldRedirect,
-                Url = shouldRedirect ? request.Callback : null
+                Url = validatedCallback
             });
         }
     }
