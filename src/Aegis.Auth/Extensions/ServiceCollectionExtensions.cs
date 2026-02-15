@@ -8,7 +8,6 @@ using Aegis.Auth.Infrastructure.Cookies;
 
 using Aegis.Auth.Abstractions;
 using Aegis.Auth.Options;
-using Aegis.Auth.Features.SignOut;
 
 namespace Aegis.Auth.Extensions
 {
@@ -39,7 +38,6 @@ namespace Aegis.Auth.Extensions
       services.AddScoped<ISessionService, SessionService>();
       services.AddScoped<ISignInService, SignInService>();
       services.AddScoped<ISignUpService, SignUpService>();
-      services.AddScoped<ISignOutService, SignOutService>();
 
       return services;
     }

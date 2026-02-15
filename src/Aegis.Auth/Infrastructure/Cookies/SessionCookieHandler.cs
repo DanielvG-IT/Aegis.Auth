@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text;
 
 using Aegis.Auth.Core.Crypto;
 using Aegis.Auth.Extensions;
@@ -8,7 +7,6 @@ using Aegis.Auth.Options;
 using Aegis.Auth.Models;
 
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Authentication;
 
 namespace Aegis.Auth.Infrastructure.Cookies
 {
@@ -82,8 +80,13 @@ namespace Aegis.Auth.Infrastructure.Cookies
             };
 
             DateTimeOffset cacheExpiry = DateTimeOffset.UtcNow.AddSeconds(_options.Session.CookieCache?.MaxAge ?? 300);
-            var payloadJson = JsonSerializer.Serialize(sessionPayload);
-            var signature = AegisSigner.GenerateSignature(payloadJson, _options.Secret);
+            var signableEnvelope = new
+            {
+                ExpiresAt = cacheExpiry.ToUnixTimeMilliseconds(),
+                Session = sessionPayload
+            };
+            var signableEnvelopeJson = JsonSerializer.Serialize(signableEnvelope);
+            var signature = AegisSigner.GenerateSignature(signableEnvelopeJson, _options.Secret);
 
             var finalEnvelope = new SessionCachePayload
             {
@@ -93,8 +96,13 @@ namespace Aegis.Auth.Infrastructure.Cookies
             };
 
             var finalJson = JsonSerializer.Serialize(finalEnvelope);
-            var encodedData = Base64UrlTextEncoder.Encode(Encoding.UTF8.GetBytes(finalJson));
-            context.Response.Cookies.Append(sessionDataCookieName, encodedData, new CookieOptions
+            var mode = _options.Session.CookieCache?.Mode ?? CookieCacheMode.Compact;
+            var cookieValue = mode switch
+            {
+                CookieCacheMode.Encrypted => AegisCrypto.Encrypt(finalJson, _options.Secret),
+                _ => AegisCrypto.ToBase64Url(finalJson), // Compact: signed but readable
+            };
+            context.Response.Cookies.Append(sessionDataCookieName, cookieValue, new CookieOptions
             {
                 HttpOnly = true,
                 Secure = !_isDevelopment,
