@@ -115,6 +115,63 @@ namespace Aegis.Auth.Infrastructure.Cookies
         }
 
         /// <summary>
+        /// Reads and validates the session_data cookie cache.
+        /// Returns the cached session metadata if valid, null if missing/expired/tampered.
+        /// </summary>
+        public SessionCacheMetadata? GetCookieCache(HttpContext context)
+        {
+            if (_options.Session.CookieCache?.Enabled is false) return null;
+
+            if (!context.Request.Cookies.TryGetValue(SessionDataCookieName, out var cookieValue))
+                return null;
+
+            if (string.IsNullOrWhiteSpace(cookieValue))
+                return null;
+
+            // Decrypt or decode based on mode
+            CookieCacheMode mode = _options.Session.CookieCache?.Mode ?? CookieCacheMode.Compact;
+            string? finalJson = mode switch
+            {
+                CookieCacheMode.Encrypted => AegisCrypto.Decrypt(cookieValue, _options.Secret),
+                _ => AegisCrypto.FromBase64UrlToString(cookieValue), // Compact: signed but readable
+            };
+
+            if (finalJson is null) return null;
+
+            // Deserialize the final envelope
+            SessionCachePayload? envelope;
+            try
+            {
+                envelope = JsonSerializer.Deserialize<SessionCachePayload>(finalJson);
+            }
+            catch
+            {
+                return null;
+            }
+
+            if (envelope is null) return null;
+
+            // Check expiration
+            var nowUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            if (envelope.ExpiresAt <= nowUnixMs)
+                return null;
+
+            // Verify signature
+            var signableEnvelope = new
+            {
+                ExpiresAt = envelope.ExpiresAt,
+                Session = envelope.Session
+            };
+            var signableJson = JsonSerializer.Serialize(signableEnvelope);
+            var expectedSignature = AegisSigner.GenerateSignature(signableJson, _options.Secret);
+
+            if (envelope.Signature != expectedSignature)
+                return null;
+
+            return envelope.Session.Session;
+        }
+
+        /// <summary>
         /// Reads the session token from the request cookie and verifies the HMAC signature.
         /// Returns the raw token if valid, null if missing or tampered.
         /// </summary>

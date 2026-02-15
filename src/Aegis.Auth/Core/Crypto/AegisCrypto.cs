@@ -94,6 +94,19 @@ internal static class AegisCrypto
     return Convert.FromBase64String(base64);
   }
 
+  public static string? FromBase64UrlToString(string encoded)
+  {
+    try
+    {
+      var bytes = FromBase64Url(encoded);
+      return Encoding.UTF8.GetString(bytes);
+    }
+    catch
+    {
+      return null;
+    }
+  }
+
   // ── Key derivation ───────────────────────────────────────────────────────
 
   private static byte[] DeriveKey(string secret)

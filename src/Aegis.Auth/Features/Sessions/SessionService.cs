@@ -78,17 +78,17 @@ namespace Aegis.Auth.Features.Sessions
         list.Add(new SessionReference { Token = data.Token, ExpiresAt = new DateTimeOffset(data.ExpiresAt).ToUnixTimeMilliseconds() });
         list.Sort((a, b) => a.ExpiresAt.CompareTo(b.ExpiresAt)); // In-place sort, more efficient
 
-        // 3. Calculate TTL for the Registry
+        // 3. Calculate TTL for the Registry (round up to prevent premature expiration)
         var furthestSessionExp = list.LastOrDefault()?.ExpiresAt ?? nowUnixMs;
-        var furthestSessionTTL = (furthestSessionExp - nowUnixMs) / 1000; // Convert to seconds
+        var furthestSessionTTL = (long)Math.Ceiling((furthestSessionExp - nowUnixMs) / 1000.0);
 
         if (furthestSessionTTL > 0)
         {
           await _cache.SetStringAsync(registryKey, JsonSerializer.Serialize(list), new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(furthestSessionTTL) });
         }
 
-        // 4. Cache the Full Session + User Data
-        var sessionTTL = (new DateTimeOffset(data.ExpiresAt).ToUnixTimeMilliseconds() - nowUnixMs) / 1000;
+        // 4. Cache the Full Session + User Data (round up to prevent premature expiration)
+        var sessionTTL = (long)Math.Ceiling((new DateTimeOffset(data.ExpiresAt).ToUnixTimeMilliseconds() - nowUnixMs) / 1000.0);
         if (sessionTTL > 0)
         {
           var sessionCacheData = JsonSerializer.Serialize(new SessionCacheJson { Session = data, User = input.User });
@@ -149,10 +149,10 @@ namespace Aegis.Auth.Features.Sessions
             }
             else
             {
-              // Recalculate TTL based on the furthest-expiring remaining session
+              // Recalculate TTL based on the furthest-expiring remaining session (round up)
               list.Sort((a, b) => a.ExpiresAt.CompareTo(b.ExpiresAt));
               var furthestExp = list[^1].ExpiresAt;
-              var ttlSeconds = (furthestExp - nowUnixMs) / 1000;
+              var ttlSeconds = (long)Math.Ceiling((furthestExp - nowUnixMs) / 1000.0);
 
               if (ttlSeconds > 0)
               {
