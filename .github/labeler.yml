@@ -1,0 +1,55 @@
+# ════════════════════════════════════════════════════════════════════════════════
+# Labeler config — maps file paths to PR labels
+# Used by .github/workflows/label.yml
+# ════════════════════════════════════════════════════════════════════════════════
+
+"core":
+    - changed-files:
+          - any-glob-to-any-file: "src/Aegis.Auth/**"
+
+"tests":
+    - changed-files:
+          - any-glob-to-any-file: "tests/**"
+
+"sample":
+    - changed-files:
+          - any-glob-to-any-file: "samples/**"
+
+"ci/cd":
+    - changed-files:
+          - any-glob-to-any-file: ".github/**"
+
+"docs":
+    - changed-files:
+          - any-glob-to-any-file:
+                - "*.md"
+                - "docs/**"
+
+"crypto":
+    - changed-files:
+          - any-glob-to-any-file: "src/Aegis.Auth/Core/Crypto/**"
+
+"sessions":
+    - changed-files:
+          - any-glob-to-any-file: "src/Aegis.Auth/Features/Sessions/**"
+
+"auth":
+    - changed-files:
+          - any-glob-to-any-file:
+                - "src/Aegis.Auth/Features/SignIn/**"
+                - "src/Aegis.Auth/Features/SignUp/**"
+                - "src/Aegis.Auth/Features/SignOut/**"
+
+"config":
+    - changed-files:
+          - any-glob-to-any-file:
+                - "src/Aegis.Auth/Options/**"
+                - "**/*.csproj"
+                - "global.json"
+                - "Aegis.slnx"
+
+"dependencies":
+    - changed-files:
+          - any-glob-to-any-file:
+                - "**/packages.lock.json"
+                - "**/Directory.Build.props"
