@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Aegis.Auth.Entities
 {
   /// <summary>
@@ -15,6 +17,7 @@ namespace Aegis.Auth.Entities
 
     // Relations
     public string UserId { get; set; } = string.Empty;
+    [JsonIgnore]
     public User User { get; set; } = null!;
   }
 }
