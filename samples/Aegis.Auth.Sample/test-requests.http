@@ -120,3 +120,8 @@ Content-Type: {{contentType}}
 }
 
 ###
+
+### Sign Out - Sign out current user (run after signing in above)
+POST {{baseUrl}}/api/auth/sign-out
+
+###
