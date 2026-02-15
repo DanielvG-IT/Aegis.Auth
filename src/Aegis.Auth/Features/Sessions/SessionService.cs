@@ -55,7 +55,29 @@ namespace Aegis.Auth.Features.Sessions
         // Possible override values later here
       };
 
-      // Always store in SecondaryStorage when available, 
+      // Save to database first if enabled (to ensure consistency before caching)
+      if (_options.Session.StoreSessionInDatabase || _cache is null)
+      {
+        _db.Sessions.Add(data);
+        try
+        {
+          await _db.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+          _logger.SessionCreationFailed(input.User.Id, ex);
+          return Result<Session>.Failure(Constants.AuthErrors.System.InternalError, "Failed to save session.");
+        }
+      }
+
+      // Cache the session only after DB persistence succeeds
+      // NOTE: There is a known race condition in the registry update when multiple concurrent
+      // session creations occur for the same user. The window between GetStringAsync and 
+      // SetStringAsync allows another request to overwrite registry entries, potentially losing
+      // session references. This impacts RevokeAllSessionsAsync which may miss sessions not in
+      // the registry. Individual session tokens remain cached and functional.
+      // Mitigation options: distributed locks (Redis WATCH/MULTI, RedLock), optimistic retry,
+      // or accepting eventual consistency. For most use cases, this degradation is acceptable.
       if (_cache is not null)
       {
         // 1. Fetch the current session list for the user
@@ -97,21 +119,6 @@ namespace Aegis.Auth.Features.Sessions
             sessionCacheData,
             new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(sessionTTL) }
           );
-        }
-      }
-
-      // if enabled or no SecondaryStorage (also) store in DB 
-      if (_options.Session.StoreSessionInDatabase || _cache is null)
-      {
-        _db.Sessions.Add(data);
-        try
-        {
-          await _db.SaveChangesAsync();
-        }
-        catch (Exception ex)
-        {
-          _logger.SessionCreationFailed(input.User.Id, ex);
-          return Result<Session>.Failure(Constants.AuthErrors.System.InternalError, "Failed to save session.");
         }
       }
 
