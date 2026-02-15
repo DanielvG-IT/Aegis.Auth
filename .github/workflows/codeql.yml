@@ -1,45 +1,58 @@
+# ════════════════════════════════════════════════════════════════════════════════
+# CodeQL — Security Analysis
+# Runs on PRs to canary/main, pushes to canary/main, and weekly scheduled scans.
+# ════════════════════════════════════════════════════════════════════════════════
 name: CodeQL
 
 on:
   push:
-    branches: [ main ]
+    branches: [canary, main]
   pull_request:
-    branches: [ main ]
+    branches: [canary, main]
   schedule:
-    - cron: '0 0 * * 1' # Run every Monday
+    - cron: "0 6 * * 1" # Every Monday at 06:00 UTC
+
+concurrency:
+  group: codeql-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
 
 jobs:
   analyze:
-    name: Analyze
+    name: CodeQL Analysis
     runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
 
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'csharp' ]
+        language: [csharp]
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
-      with:
-        languages: ${{ matrix.language }}
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '10.0.x'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
 
-    - name: Build
-      run: dotnet build --configuration Release
+      - name: Build
+        run: dotnet build -c Release
 
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
-      with:
-        category: "/language:${{matrix.language}}"
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
