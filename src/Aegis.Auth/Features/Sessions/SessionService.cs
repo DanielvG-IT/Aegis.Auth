@@ -3,6 +3,7 @@ using System.Text.Json;
 using Aegis.Auth.Abstractions;
 using Aegis.Auth.Core.Crypto;
 using Aegis.Auth.Entities;
+using Aegis.Auth.Extensions;
 using Aegis.Auth.Logging;
 using Aegis.Auth.Options;
 
@@ -44,11 +45,10 @@ namespace Aegis.Auth.Features.Sessions
         IpAddress = input.IpAddress,
         UserAgent = input.UserAgent,
 
-        // If the user doesn't want to be remembered, set the session to expire in 1 day.
-        // The cookie will be set to expire at the end of the session
+        // If the user doesn't want to be remembered, set the session to expire in 1 day. The cookie will be set to expire at the end of the session.
+        // Do NOT set User navigation property. Setting the nav property causes EF Core tracking conflicts when the User is already tracked by the DbContext.
         ExpiresAt = input.DontRememberMe ? now.AddDays(1) : now.AddSeconds(sessionExpiration),
         UserId = input.User.Id,
-        User = input.User,
         Token = AegisCrypto.RandomStringGenerator(32, "a-z", "A-Z", "0-9"),
         CreatedAt = now,
         UpdatedAt = now,
@@ -139,7 +139,7 @@ namespace Aegis.Auth.Features.Sessions
         var sessionTTL = (long)Math.Ceiling((sessionExpiryUnixMs - nowUnixMs) / 1000.0);
         if (sessionTTL > 0)
         {
-          var sessionCacheData = JsonSerializer.Serialize(new SessionCacheJson { Session = data, User = input.User });
+          var sessionCacheData = JsonSerializer.Serialize(new SessionCacheJson { Session = data.ToDto(), User = input.User.ToDto() });
           await _cache.SetStringAsync(
             data.Token,
             sessionCacheData,

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Aegis.Auth.Entities
 {
   /// <summary>
@@ -13,8 +15,10 @@ namespace Aegis.Auth.Entities
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
-    // Relations
+    // Relations — JsonIgnore prevents circular reference during cache serialization
+    [JsonIgnore]
     public ICollection<Account> Accounts { get; } = [];
+    [JsonIgnore]
     public ICollection<Session> Sessions { get; } = [];
   }
 }
