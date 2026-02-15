@@ -48,7 +48,7 @@ namespace Aegis.Auth.Features.Sessions
         ExpiresAt = input.DontRememberMe ? now.AddDays(1) : now.AddSeconds(sessionExpiration),
         UserId = input.User.Id,
         User = input.User,
-        Token = RandomStringGenerator.Generate(32, "a-z", "A-Z", "0-9"),
+        Token = AegisCrypto.RandomStringGenerator(32, "a-z", "A-Z", "0-9"),
         CreatedAt = now,
         UpdatedAt = now,
         // Possible override values later here
