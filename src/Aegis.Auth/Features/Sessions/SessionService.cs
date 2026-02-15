@@ -7,6 +7,7 @@ using Aegis.Auth.Logging;
 using Aegis.Auth.Options;
 
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Aegis.Auth.Features.Sessions
@@ -34,7 +35,7 @@ namespace Aegis.Auth.Features.Sessions
 
       var sessionExpiration = _options.Session.ExpiresIn is not 0 ? _options.Session.ExpiresIn : DefaultSessionExpiration;
 
-      var now = DateTime.UtcNow;
+      DateTime now = DateTime.UtcNow;
       var nowUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
       var data = new Session
@@ -118,31 +119,126 @@ namespace Aegis.Auth.Features.Sessions
       return data;
     }
 
-    // After you remove a token from the list, check if the list is count == 0. 
-    // If so, Remove the key instead of Set an empty array. Redis loves it when you delete keys; 
-    // + it keeps the memory footprint tiny.
-
-    /*
-      Cache First: Kill the session in Redis. This immediately "de-authenticates" the user for any incoming requests hitting the middleware.
-      Cookie Second: Tell the browser to nuke the cookie. TODO: Dont know how though
-      Registry/DB Last: These are for "record keeping." If these fail, the user is still functionally logged out because the Cache and Cookie are gone.
-    */
-    /*
-      Can you implement the Registry cleanup so that it recalculates the TTL of the Registry key based on the next expiring session? 
-      If Session A expires in 1 hour and Session B in 7 days, and you delete Session B, the Redis Registry key for that user should automatically have its TTL reduced to 1 hour. 
-    */
-    public Task<Result> RevokeSessionAsync(SessionDeleteInput input)
+    public async Task<Result> RevokeSessionAsync(SessionDeleteInput input)
     {
-      var registryKey = RegistryKeyPrefix + input.User.Id;
-      throw new NotImplementedException();
-      // Result.Success()
+      var token = input.Token;
+      _logger.SessionRevoking(token);
+
+      // 1. Remove session from cache (immediately de-authenticates for incoming requests)
+      if (_cache is not null)
+      {
+        await _cache.RemoveAsync(token);
+
+        // 2. Update the active-sessions registry
+        var registryKey = RegistryKeyPrefix + input.User.Id;
+        var registryJson = await _cache.GetStringAsync(registryKey);
+
+        if (string.IsNullOrWhiteSpace(registryJson) is false)
+        {
+          List<SessionReference>? list = JsonSerializer.Deserialize<List<SessionReference>>(registryJson);
+          if (list is not null)
+          {
+            var nowUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            // Remove the revoked session and any expired ones
+            list = [.. list.Where(s => s.Token != token && s.ExpiresAt > nowUnixMs)];
+
+            if (list.Count == 0)
+            {
+              // No sessions left — delete the key entirely (Redis-friendly)
+              await _cache.RemoveAsync(registryKey);
+            }
+            else
+            {
+              // Recalculate TTL based on the furthest-expiring remaining session
+              list.Sort((a, b) => a.ExpiresAt.CompareTo(b.ExpiresAt));
+              var furthestExp = list[^1].ExpiresAt;
+              var ttlSeconds = (furthestExp - nowUnixMs) / 1000;
+
+              if (ttlSeconds > 0)
+              {
+                await _cache.SetStringAsync(registryKey, JsonSerializer.Serialize(list),
+                  new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(ttlSeconds) });
+              }
+              else
+              {
+                await _cache.RemoveAsync(registryKey);
+              }
+            }
+          }
+        }
+      }
+
+      // 3. Remove from database (record-keeping; user is already functionally signed out)
+      if (_options.Session.StoreSessionInDatabase || _cache is null)
+      {
+        Session? dbSession = await _db.Sessions.FirstOrDefaultAsync(s => s.Token == token && s.UserId == input.User.Id);
+        if (dbSession is not null)
+        {
+          _db.Sessions.Remove(dbSession);
+          try
+          {
+            await _db.SaveChangesAsync();
+          }
+          catch (Exception ex)
+          {
+            _logger.SessionRevocationFailed(token, ex);
+            return Result.Failure(Constants.AuthErrors.System.InternalError, "Failed to revoke session.");
+          }
+        }
+      }
+
+      _logger.SessionRevoked(token, input.User.Id);
+      return Result.Success();
     }
 
     public async Task<Result> RevokeAllSessionsAsync(string userId)
     {
-      var registryKey = RegistryKeyPrefix + userId;
-      throw new NotImplementedException();
-      // Result.Success()
+      _logger.SessionRevokingAll(userId);
+
+      // 1. Remove all cached sessions via the registry
+      if (_cache is not null)
+      {
+        var registryKey = RegistryKeyPrefix + userId;
+        var registryJson = await _cache.GetStringAsync(registryKey);
+
+        if (string.IsNullOrWhiteSpace(registryJson) is false)
+        {
+          List<SessionReference>? list = JsonSerializer.Deserialize<List<SessionReference>>(registryJson);
+          if (list is not null)
+          {
+            // Remove each cached session
+            foreach (SessionReference entry in list)
+            {
+              await _cache.RemoveAsync(entry.Token);
+            }
+          }
+
+          // Delete the registry key itself
+          await _cache.RemoveAsync(registryKey);
+        }
+      }
+
+      // 2. Remove all from database
+      if (_options.Session.StoreSessionInDatabase || _cache is null)
+      {
+        List<Session> dbSessions = await _db.Sessions.Where(s => s.UserId == userId).ToListAsync();
+        if (dbSessions.Count > 0)
+        {
+          _db.Sessions.RemoveRange(dbSessions);
+          try
+          {
+            await _db.SaveChangesAsync();
+          }
+          catch (Exception ex)
+          {
+            _logger.SessionRevocationFailed(userId, ex);
+            return Result.Failure(Constants.AuthErrors.System.InternalError, "Failed to revoke sessions.");
+          }
+        }
+      }
+
+      _logger.SessionRevokedAll(userId);
+      return Result.Success();
     }
   }
 }

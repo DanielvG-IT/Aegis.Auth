@@ -22,7 +22,7 @@ namespace Aegis.Auth.Abstractions
         return callback;
 
       // Reject anything that isn't a valid absolute URI
-      if (!Uri.TryCreate(callback, UriKind.Absolute, out var uri))
+      if (!Uri.TryCreate(callback, UriKind.Absolute, out Uri? uri))
         return null;
 
       // Only allow http/https schemes

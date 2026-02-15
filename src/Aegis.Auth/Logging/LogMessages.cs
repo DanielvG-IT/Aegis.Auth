@@ -241,5 +241,69 @@ namespace Aegis.Auth.Logging
             Level = LogLevel.Warning,
             Message = "Session {SessionId} validation failed: Session not found")]
         internal static partial void SessionNotFound(this ILogger logger, string sessionId);
+
+        [LoggerMessage(
+            EventId = 3006,
+            Level = LogLevel.Debug,
+            Message = "Revoking session {Token}")]
+        internal static partial void SessionRevoking(this ILogger logger, string token);
+
+        [LoggerMessage(
+            EventId = 3007,
+            Level = LogLevel.Information,
+            Message = "Session {Token} revoked successfully for user {UserId}")]
+        internal static partial void SessionRevoked(this ILogger logger, string token, string userId);
+
+        [LoggerMessage(
+            EventId = 3008,
+            Level = LogLevel.Error,
+            Message = "Failed to revoke session {Token}")]
+        internal static partial void SessionRevocationFailed(this ILogger logger, string token, Exception exception);
+
+        [LoggerMessage(
+            EventId = 3009,
+            Level = LogLevel.Debug,
+            Message = "Revoking all sessions for user {UserId}")]
+        internal static partial void SessionRevokingAll(this ILogger logger, string userId);
+
+        [LoggerMessage(
+            EventId = 3010,
+            Level = LogLevel.Information,
+            Message = "All sessions revoked for user {UserId}")]
+        internal static partial void SessionRevokedAll(this ILogger logger, string userId);
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // Sign Out Messages
+        // ═══════════════════════════════════════════════════════════════════════════════
+
+        [LoggerMessage(
+            EventId = 4000,
+            Level = LogLevel.Debug,
+            Message = "SignOut attempt initiated")]
+        internal static partial void SignOutAttemptInitiated(this ILogger logger);
+
+        [LoggerMessage(
+            EventId = 4001,
+            Level = LogLevel.Warning,
+            Message = "SignOut failed: No session token found in request")]
+        internal static partial void SignOutNoToken(this ILogger logger);
+
+        [LoggerMessage(
+            EventId = 4002,
+            Level = LogLevel.Warning,
+            Message = "SignOut failed: Session not found for token {Token}")]
+        internal static partial void SignOutSessionNotFound(this ILogger logger, string token);
+
+        [LoggerMessage(
+            EventId = 4003,
+            Level = LogLevel.Error,
+            Message = "SignOut failed: Session revocation failed for token {Token}")]
+        internal static partial void SignOutRevocationFailed(this ILogger logger, string token);
+
+        [LoggerMessage(
+            EventId = 4004,
+            Level = LogLevel.Information,
+            Message = "SignOut successful for user {UserId}")]
+        internal static partial void SignOutSuccessful(this ILogger logger, string userId);
     }
 }

@@ -13,8 +13,7 @@ namespace Aegis.Auth.Features.Sessions
     public class SessionDeleteInput
     {
         public required User User { get; init; }
-        public required string UserAgent { get; init; }
-        public required string IpAddress { get; init; }
+        public required string Token { get; init; }
     }
 
     internal record SessionReference

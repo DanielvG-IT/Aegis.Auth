@@ -13,7 +13,7 @@ public static class DataSeeder
       return;
     }
 
-    var now = DateTime.UtcNow;
+    DateTime now = DateTime.UtcNow;
 
     // Create a test user
     var user = new User

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 
 using Aegis.Auth.Features.SignIn;
 using Aegis.Auth.Features.SignUp;
+using Aegis.Auth.Features.SignOut;
 using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Infrastructure.Cookies;
 
@@ -38,6 +39,7 @@ namespace Aegis.Auth.Extensions
       services.AddScoped<ISessionService, SessionService>();
       services.AddScoped<ISignInService, SignInService>();
       services.AddScoped<ISignUpService, SignUpService>();
+      services.AddScoped<ISignOutService, SignOutService>();
 
       return services;
     }

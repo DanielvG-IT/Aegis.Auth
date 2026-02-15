@@ -29,5 +29,12 @@ namespace Aegis.Auth.Constants
       public const string EmailNotVerified = "EMAIL_NOT_VERIFIED";
       public const string UserAlreadyExists = "USER_ALREADY_EXISTS";
     }
+
+    // 🔑 Session
+    public static class Session
+    {
+      public const string SessionNotFound = "SESSION_NOT_FOUND";
+      public const string SessionExpired = "SESSION_EXPIRED";
+    }
   }
 }

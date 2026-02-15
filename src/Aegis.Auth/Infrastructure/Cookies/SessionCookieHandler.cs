@@ -15,22 +15,22 @@ namespace Aegis.Auth.Infrastructure.Cookies
         private readonly AegisAuthOptions _options = options;
         private readonly bool _isDevelopment = isDevelopment;
 
-        // TODO Cookie roadmap (better-auth parity, .NET-idiomatic):
-        // [ ] Replace direct options object usage with IOptions/IOptionsSnapshot in DI registration
+        // TODO Cookie roadmap:
         // [ ] Add per-cookie config models (session_token, session_data, dont_remember)
         // [ ] Support per-cookie + default attribute overrides from configuration
         // [ ] Add secure prefix strategy (__Host-/__Secure-) and configurable cookie prefix
         // [ ] Add optional cross-subdomain domain support
         // [ ] Add chunking for oversized session_data cookies (>4093 bytes)
-        // [ ] Add cookie read/verify helpers (session token + session cache)
-        // [ ] Add delete/expire flow including chunk cleanup + dont_remember cleanup
         // [ ] Align remember-me behavior between sign-in and sign-up flows
-        // [ ] Migrate signing/encryption to ASP.NET Core Data Protection
+
+        private string SessionCookieName => _isDevelopment ? "aegis.session" : "__Host-aegis.session";
+        private string SessionDataCookieName => _isDevelopment ? "aegis.session_data" : "__Host-aegis.session_data";
+        private string DontRememberCookieName => _isDevelopment ? "aegis.dont_remember" : "__Host-aegis.dont_remember";
 
         public void SetSessionCookie(HttpContext context, Session session, User user, bool rememberMe)
         {
-            var sessionCookieName = _isDevelopment ? "aegis.session" : "__Host-aegis.session";
-            var dontRememberCookieName = _isDevelopment ? "aegis.dont_remember" : "__Host-aegis.dont_remember";
+            var sessionCookieName = SessionCookieName;
+            var dontRememberCookieName = DontRememberCookieName;
 
             var signedToken = AegisSigner.Sign(session.Token, _options.Secret);
             var sessionOptions = new CookieOptions
@@ -66,7 +66,7 @@ namespace Aegis.Auth.Infrastructure.Cookies
         {
             if (_options.Session.CookieCache?.Enabled is false) return;
 
-            var sessionDataCookieName = _isDevelopment ? "aegis.session_data" : "__Host-aegis.session_data";
+            var sessionDataCookieName = SessionDataCookieName;
 
             var sessionPayload = new SessionCacheDto
             {
@@ -96,7 +96,7 @@ namespace Aegis.Auth.Infrastructure.Cookies
             };
 
             var finalJson = JsonSerializer.Serialize(finalEnvelope);
-            var mode = _options.Session.CookieCache?.Mode ?? CookieCacheMode.Compact;
+            CookieCacheMode mode = _options.Session.CookieCache?.Mode ?? CookieCacheMode.Compact;
             var cookieValue = mode switch
             {
                 CookieCacheMode.Encrypted => AegisCrypto.Encrypt(finalJson, _options.Secret),
@@ -112,6 +112,49 @@ namespace Aegis.Auth.Infrastructure.Cookies
             });
 
             return;
+        }
+
+        /// <summary>
+        /// Reads the session token from the request cookie and verifies the HMAC signature.
+        /// Returns the raw token if valid, null if missing or tampered.
+        /// </summary>
+        public string? GetSessionToken(HttpContext context)
+        {
+            if (!context.Request.Cookies.TryGetValue(SessionCookieName, out var signedValue))
+                return null;
+
+            if (string.IsNullOrWhiteSpace(signedValue))
+                return null;
+
+            // Format: "token.signature"
+            var dotIndex = signedValue.LastIndexOf('.');
+            if (dotIndex <= 0 || dotIndex >= signedValue.Length - 1)
+                return null;
+
+            var token = signedValue[..dotIndex];
+            var signature = signedValue[(dotIndex + 1)..];
+
+            return AegisSigner.VerifySignature(token, signature, _options.Secret)
+                ? token
+                : null;
+        }
+
+        /// <summary>
+        /// Deletes all Aegis session cookies (session_token, session_data, dont_remember).
+        /// </summary>
+        public void ClearSessionCookies(HttpContext context)
+        {
+            var deleteOptions = new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = !_isDevelopment,
+                SameSite = SameSiteMode.Lax,
+                Path = "/"
+            };
+
+            context.Response.Cookies.Delete(SessionCookieName, deleteOptions);
+            context.Response.Cookies.Delete(SessionDataCookieName, deleteOptions);
+            context.Response.Cookies.Delete(DontRememberCookieName, deleteOptions);
         }
     }
 }
