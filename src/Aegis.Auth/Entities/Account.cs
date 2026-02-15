@@ -8,13 +8,13 @@ namespace Aegis.Auth.Entities
     public string Id { get; set; } = string.Empty;
     public string AccountId { get; set; } = string.Empty;
     public string ProviderId { get; set; } = string.Empty;
-    public string? AccessToken { get; set; } = string.Empty;
-    public string? RefreshToken { get; set; } = string.Empty;
+    public string? AccessToken { get; set; } = null;
+    public string? RefreshToken { get; set; } = null;
     public DateTime? AccessTokenExpiresAt { get; set; }
     public DateTime? RefreshTokenExpiresAt { get; set; }
-    public string? Scope { get; set; } = string.Empty;
-    public string? IdToken { get; set; } = string.Empty;
-    public string? PasswordHash { get; set; } = string.Empty;
+    public string? Scope { get; set; } = null;
+    public string? IdToken { get; set; } = null;
+    public string? PasswordHash { get; set; } = null;
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

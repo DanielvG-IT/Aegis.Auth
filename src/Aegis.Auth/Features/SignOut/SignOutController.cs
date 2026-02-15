@@ -17,12 +17,18 @@ namespace Aegis.Auth.Features.SignOut
             // 1. Read & verify the session token from the cookie
             var token = _cookieHandler.GetSessionToken(HttpContext);
 
-            // 2. Revoke session (cache -> registry -> DB)
+            // 2. Always clear cookies first
+            _cookieHandler.ClearSessionCookies(HttpContext);
+
+            // 3. If no valid token, return early (user already signed out or tampered cookie)
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return Ok(new SignOutResponse { Success = true });
+            }
+
+            // 4. Revoke session (cache -> registry -> DB)
             var input = new SignOutInput { Token = token };
             Result result = await signOutService.SignOut(input);
-
-            // 3. Always clear cookies, even if revocation fails or session is already gone
-            _cookieHandler.ClearSessionCookies(HttpContext);
 
             if (result.IsSuccess is false)
                 return HandleResult(result);

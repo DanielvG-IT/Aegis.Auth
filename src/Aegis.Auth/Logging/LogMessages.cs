@@ -157,8 +157,8 @@ namespace Aegis.Auth.Logging
         [LoggerMessage(
           EventId = 2004,
           Level = LogLevel.Warning,
-          Message = "SignUp attempt failed: Password is too short (minimum {MinLength} characters)")]
-        internal static partial void SignUpPasswordTooLong(this ILogger logger, int minLength);
+          Message = "SignUp attempt failed: Password is too long (maximum {MaxLength} characters)")]
+        internal static partial void SignUpPasswordTooLong(this ILogger logger, int maxLength);
 
         [LoggerMessage(
             EventId = 2005,

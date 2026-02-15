@@ -5,7 +5,7 @@ namespace Aegis.Auth.Features.SignOut
         /// <summary>
         /// The raw session token extracted from the session cookie.
         /// </summary>
-        public required string? Token { get; init; }
+        public required string Token { get; init; }
     }
 
     public class SignOutResponse

@@ -26,12 +26,6 @@ namespace Aegis.Auth.Features.SignOut
         {
             _logger.SignOutAttemptInitiated();
 
-            if (string.IsNullOrWhiteSpace(input.Token))
-            {
-                _logger.SignOutNoToken();
-                return Result.Failure(AuthErrors.Identity.InvalidCredentials, "No active session found.");
-            }
-
             // Look up the session to get the userId for registry cleanup
             Session? session = await _db.Sessions
                 .Include(s => s.User)

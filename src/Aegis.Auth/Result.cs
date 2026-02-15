@@ -56,7 +56,7 @@ namespace Aegis.Auth
         {
             return IsSuccess
             ? Result.Success()
-            : Result.Failure(ErrorCode!, Message!);
+            : Result.Failure(ErrorCode ?? "UNKNOWN_ERROR", Message ?? "An unknown error occurred");
         }
 
         // The "Magic" implicit operator
