@@ -1,0 +1,24 @@
+version: 2
+updates:
+    # 1. Nuget (.NET C# Library code)
+    - package-ecosystem: "nuget"
+      directory: "/"
+      schedule:
+          interval: "weekly"
+          day: "monday"
+      open-pull-requests-limit: 5
+      # Grouping keeps canary branch from being cluttered
+      groups:
+          dotnet-dependencies:
+              patterns:
+                  - "*"
+
+    # 2. GitHub Actions (Keep CI/CD workflows secure)
+    - package-ecosystem: "github-actions"
+      directory: "/"
+      schedule:
+          interval: "weekly"
+      groups:
+          actions-dependencies:
+              patterns:
+                  - "*"
