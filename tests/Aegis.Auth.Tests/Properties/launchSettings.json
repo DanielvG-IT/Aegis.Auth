@@ -1,0 +1,10 @@
+{
+    "profiles": {
+        "Aegis.Auth.Tests": {
+            "commandName": "Project",
+            "environmentVariables": {
+                "XCEED_FLUENTASSERTIONS_COMMUNITY_LICENSE": "yes"
+            }
+        }
+    }
+}
