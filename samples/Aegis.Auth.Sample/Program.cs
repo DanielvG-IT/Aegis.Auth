@@ -1,5 +1,5 @@
-using Aegis.Auth.Options;
 using Aegis.Auth.Extensions;
+using Aegis.Auth.Options;
 using Aegis.Auth.Sample.Data;
 
 using Microsoft.EntityFrameworkCore;

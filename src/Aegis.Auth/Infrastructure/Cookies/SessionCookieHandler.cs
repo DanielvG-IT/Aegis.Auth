@@ -1,10 +1,10 @@
 using System.Text.Json;
 
 using Aegis.Auth.Core.Crypto;
-using Aegis.Auth.Extensions;
 using Aegis.Auth.Entities;
-using Aegis.Auth.Options;
+using Aegis.Auth.Extensions;
 using Aegis.Auth.Models;
+using Aegis.Auth.Options;
 
 using Microsoft.AspNetCore.Http;
 

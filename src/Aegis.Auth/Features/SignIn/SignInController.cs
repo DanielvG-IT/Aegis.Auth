@@ -1,5 +1,5 @@
-using Aegis.Auth.Extensions;
 using Aegis.Auth.Abstractions;
+using Aegis.Auth.Extensions;
 using Aegis.Auth.Infrastructure.Cookies;
 using Aegis.Auth.Options;
 
