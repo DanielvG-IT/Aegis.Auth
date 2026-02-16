@@ -1,7 +1,7 @@
+using System.Text.Json.Serialization;
+
 using Aegis.Auth.Entities;
 using Aegis.Auth.Models;
-
-using System.Text.Json.Serialization;
 
 namespace Aegis.Auth.Features.SignIn
 {

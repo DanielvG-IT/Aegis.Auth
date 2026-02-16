@@ -7,8 +7,8 @@ using Aegis.Auth.Extensions;
 using Aegis.Auth.Logging;
 using Aegis.Auth.Options;
 
-using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 
 namespace Aegis.Auth.Features.Sessions

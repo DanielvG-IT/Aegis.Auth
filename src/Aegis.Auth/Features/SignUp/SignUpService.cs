@@ -1,7 +1,7 @@
-using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Abstractions;
 using Aegis.Auth.Constants;
 using Aegis.Auth.Entities;
+using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Logging;
 using Aegis.Auth.Options;
 
