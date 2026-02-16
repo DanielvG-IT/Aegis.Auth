@@ -1,4 +1,5 @@
 using Aegis.Auth.Entities;
+using Aegis.Auth.Models;
 
 namespace Aegis.Auth.Features.Sessions
 {
@@ -22,9 +23,9 @@ namespace Aegis.Auth.Features.Sessions
         public long ExpiresAt { get; init; } // When THIS specific session dies
     }
 
-    public record SessionCacheJson
+    internal record SessionCacheJson
     {
-        public required Session Session { get; init; }
-        public required User User { get; init; }
+        public required SessionDto Session { get; init; }
+        public required UserDto User { get; init; }
     }
 }
