@@ -38,7 +38,8 @@ jobs:
         id: version
         run: |
           # Use the latest tag as base version, or default to 0.1.0
-          BASE_VERSION=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' | sed 's/-.*$//' || echo "0.1.0")
+          TAG=$(git describe --tags --abbrev=0 2>/dev/null) || TAG="v0.1.0"
+          BASE_VERSION=$(echo "$TAG" | sed 's/^v//' | sed 's/-.*$//')
           # Short SHA for uniqueness
           SHORT_SHA=$(git rev-parse --short HEAD)
           PRERELEASE_VERSION="${BASE_VERSION}-canary.${GITHUB_RUN_NUMBER}.${SHORT_SHA}"
