@@ -1,0 +1,23 @@
+# ════════════════════════════════════════════════════════════════════════════════
+# Auto-Label — Label PRs based on files changed
+# Helps keep the PR list organized at a glance.
+# ════════════════════════════════════════════════════════════════════════════════
+name: Auto Label
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    name: Label PR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/labeler@v5
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          sync-labels: true

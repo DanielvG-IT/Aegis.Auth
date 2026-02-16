@@ -1,25 +1,32 @@
 version: 2
 updates:
-    # 1. Nuget (.NET C# Library code)
+    # 1. NuGet (.NET dependencies)
     - package-ecosystem: "nuget"
       directory: "/"
+      target-branch: "canary"
       schedule:
           interval: "weekly"
           day: "monday"
       open-pull-requests-limit: 5
-      # Grouping keeps canary branch from being cluttered
+      commit-message:
+          prefix: "deps"
+          include: "scope"
       groups:
           dotnet-dependencies:
               patterns:
                   - "*"
 
-    # 2. GitHub Actions (Keep CI/CD workflows secure)
+    # 2. GitHub Actions (keep CI/CD workflows secure & up-to-date)
     - package-ecosystem: "github-actions"
       directory: "/"
+      target-branch: "canary"
       schedule:
           interval: "weekly"
           day: "monday"
       open-pull-requests-limit: 5
+      commit-message:
+          prefix: "ci"
+          include: "scope"
       groups:
           actions-dependencies:
               patterns:
