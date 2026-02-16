@@ -1,35 +1,182 @@
+# ════════════════════════════════════════════════════════════════════════════════
+# CI — Pull Request Gate
+# Runs on every PR targeting canary or main.
+# Must pass before merge is allowed (configure branch protection rules).
+# ════════════════════════════════════════════════════════════════════════════════
 name: CI
 
 on:
-  push:
-    branches:
-      - '**'
   pull_request:
-    branches:
-      - '**'
+    branches: [canary, main]
+  # Allow manual trigger for debugging
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  CONFIGURATION: Release
 
 jobs:
-  build-and-test:
-    name: Build and Test
+  # ──────────────────────────────────────────────────────────────────────────────
+  # 1. Code Quality Gate
+  # ──────────────────────────────────────────────────────────────────────────────
+  quality:
+    name: Code Quality
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '10.0.x'
-        
-    - name: Restore dependencies
-      run: dotnet restore
-      
-    - name: Build
-      run: dotnet build --no-restore --configuration Release
-      
-    - name: Test
-      run: dotnet test --no-build --configuration Release --verbosity normal
-      
-    - name: Build Sample
-      run: dotnet build samples/Aegis.Auth.Sample/Aegis.Auth.Sample.csproj --configuration Release
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Check formatting
+        run: dotnet format --verify-no-changes --verbosity diagnostic
+
+      - name: Security audit (NuGet)
+        run: |
+          dotnet list package --vulnerable --include-transitive 2>&1 | tee audit.txt
+          if grep -qi "has the following vulnerable packages" audit.txt; then
+            echo "::error::Vulnerable NuGet packages detected. Run 'dotnet list package --vulnerable' locally."
+            exit 1
+          fi
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # 2. Build + Test Matrix
+  # ──────────────────────────────────────────────────────────────────────────────
+  build-and-test:
+    name: Build & Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore -c ${{ env.CONFIGURATION }} -warnaserror
+
+      - name: Test with coverage
+        run: >
+          dotnet test --no-build -c ${{ env.CONFIGURATION }}
+          --logger "trx;LogFileName=results.trx"
+          --collect:"XPlat Code Coverage"
+          --results-directory ./TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}
+          path: ./TestResults
+          retention-days: 14
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && always()
+        uses: codecov/codecov-action@v5
+        with:
+          directory: ./TestResults
+          fail_ci_if_error: false
+        continue-on-error: true
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # 3. Package Validation (dry-run)
+  # ──────────────────────────────────────────────────────────────────────────────
+  pack-validation:
+    name: Pack Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore & Build
+        run: dotnet build -c ${{ env.CONFIGURATION }}
+
+      - name: Pack (dry-run)
+        run: dotnet pack src/Aegis.Auth/Aegis.Auth.csproj --no-build -c ${{ env.CONFIGURATION }} -o ./artifacts
+
+      - name: Validate package
+        run: |
+          NUPKG=$(find ./artifacts -name '*.nupkg' | head -1)
+          echo "📦 Package: $(basename "$NUPKG")"
+          echo "📏 Size: $(du -h "$NUPKG" | cut -f1)"
+          # Ensure package is not unreasonably large (>5MB is suspicious for an auth lib)
+          SIZE=$(stat -c%s "$NUPKG" 2>/dev/null || stat -f%z "$NUPKG")
+          if [ "$SIZE" -gt 5242880 ]; then
+            echo "::error::Package is larger than 5MB ($SIZE bytes). Investigate."
+            exit 1
+          fi
+
+      - name: Upload preview package
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkg-preview
+          path: ./artifacts/*.nupkg
+          retention-days: 7
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # 4. Sample app builds (catches public API breaks)
+  # ──────────────────────────────────────────────────────────────────────────────
+  sample-app:
+    name: Sample App Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Build sample
+        run: dotnet build samples/Aegis.Auth.Sample/Aegis.Auth.Sample.csproj -c ${{ env.CONFIGURATION }} -warnaserror
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # 5. Final gate — aggregates all job statuses for branch protection
+  # ──────────────────────────────────────────────────────────────────────────────
+  ci-passed:
+    name: CI Passed
+    if: always()
+    needs: [quality, build-and-test, pack-validation, sample-app]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate results
+        run: |
+          echo "Quality:      ${{ needs.quality.result }}"
+          echo "Build & Test: ${{ needs.build-and-test.result }}"
+          echo "Pack:         ${{ needs.pack-validation.result }}"
+          echo "Sample App:   ${{ needs.sample-app.result }}"
+
+          if [[ "${{ needs.quality.result }}" != "success" ]] ||
+             [[ "${{ needs.build-and-test.result }}" != "success" ]] ||
+             [[ "${{ needs.pack-validation.result }}" != "success" ]] ||
+             [[ "${{ needs.sample-app.result }}" != "success" ]]; then
+            echo "::error::One or more CI checks failed."
+            exit 1
+          fi
+
+          echo "✅ All CI checks passed."

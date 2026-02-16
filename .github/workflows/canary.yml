@@ -1,0 +1,110 @@
+# ════════════════════════════════════════════════════════════════════════════════
+# Canary — Pre-release Pipeline
+# Triggers on every push to canary (i.e., merged PRs).
+# Builds, tests, packs a pre-release NuGet, publishes to GitHub Packages,
+# and creates a GitHub pre-release.
+# ════════════════════════════════════════════════════════════════════════════════
+name: Canary
+
+on:
+  push:
+    branches: [canary]
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  CONFIGURATION: Release
+
+jobs:
+  canary:
+    name: Canary Build & Publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history for version calculation
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Calculate pre-release version
+        id: version
+        run: |
+          # Use the latest tag as base version, or default to 0.1.0
+          BASE_VERSION=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' | sed 's/-.*$//' || echo "0.1.0")
+          # Short SHA for uniqueness
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          PRERELEASE_VERSION="${BASE_VERSION}-canary.${GITHUB_RUN_NUMBER}.${SHORT_SHA}"
+          echo "version=${PRERELEASE_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "📦 Canary version: ${PRERELEASE_VERSION}"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore -c ${{ env.CONFIGURATION }}
+
+      - name: Test
+        run: >
+          dotnet test --no-build -c ${{ env.CONFIGURATION }}
+          --logger "trx;LogFileName=results.trx"
+          --collect:"XPlat Code Coverage"
+          --results-directory ./TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: canary-test-results
+          path: ./TestResults
+          retention-days: 30
+
+      - name: Pack pre-release
+        run: >
+          dotnet pack src/Aegis.Auth/Aegis.Auth.csproj
+          --no-build -c ${{ env.CONFIGURATION }}
+          -o ./artifacts
+          /p:PackageVersion=${{ steps.version.outputs.version }}
+
+      - name: Upload NuGet artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: canary-nupkg
+          path: ./artifacts/*.nupkg
+          retention-days: 90
+
+      - name: Publish to GitHub Packages
+        run: >
+          dotnet nuget push ./artifacts/*.nupkg
+          --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+          --api-key ${{ secrets.GITHUB_TOKEN }}
+          --skip-duplicate
+
+      - name: Create GitHub pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: "🐤 Canary v${{ steps.version.outputs.version }}"
+          prerelease: true
+          generate_release_notes: true
+          files: ./artifacts/*.nupkg
+          body: |
+            ## Canary Release
+
+            ⚠️ **This is a pre-release build from the `canary` branch.**
+            Not recommended for production use.
+
+            **Version:** `${{ steps.version.outputs.version }}`
+            **Commit:** [`${{ github.sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+
+            ### Install
+            ```bash
+            dotnet add package Aegis.Auth --version ${{ steps.version.outputs.version }} --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+            ```
