@@ -489,7 +489,7 @@ public sealed class SignUpServiceTests : IDisposable
   // ═══════════════════════════════════════════════════════════════════════════
 
   [Fact]
-  public async Task SignUpEmail_FeatureDisabled_NeverTouchesDatabase()
+  public async Task SignUpEmail_FeatureDisabled_DoesNotModifyDatabase()
   {
     _fixture.Options.EmailAndPassword.Enabled = false;
     var userCountBefore = _fixture.DbContext.Users.Count();
@@ -497,7 +497,7 @@ public sealed class SignUpServiceTests : IDisposable
     await _sut.SignUpEmail(ValidInput());
 
     _fixture.DbContext.Users.Count().Should().Be(userCountBefore,
-        "no DB interaction should occur when feature is disabled");
+        "no users should be created when feature is disabled");
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

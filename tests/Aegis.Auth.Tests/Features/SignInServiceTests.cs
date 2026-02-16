@@ -63,12 +63,12 @@ public sealed class SignInServiceTests : IDisposable
   }
 
   [Fact]
-  public async Task SignInEmail_WhenFeatureDisabled_NeverHitsDatabase()
+  public async Task SignInEmail_WhenFeatureDisabled_ReturnsFeatureDisabledEvenIfUserExists()
   {
     _fixture.Options.EmailAndPassword.Enabled = false;
     await _fixture.SeedUserAsync();
 
-    // If it hit the DB, the test wouldn't fail — but this proves the early return
+    // Seed a user to show the outcome is independent of existing DB state
     var result = await _sut.SignInEmail(ValidInput());
     result.ErrorCode.Should().Be(AuthErrors.System.FeatureDisabled);
   }
