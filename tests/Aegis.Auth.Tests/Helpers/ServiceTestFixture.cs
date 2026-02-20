@@ -72,7 +72,7 @@ internal sealed class ServiceTestFixture : IDisposable
         string password = "ValidPass123!",
         string? name = "Test User")
     {
-        var now = DateTime.UtcNow;
+        DateTime now = DateTime.UtcNow;
         var hashedPassword = await Options.EmailAndPassword.Password.Hash(password);
 
         var user = new User
@@ -107,7 +107,7 @@ internal sealed class ServiceTestFixture : IDisposable
     /// </summary>
     public async Task<User> SeedOAuthOnlyUserAsync(string email = "oauth@test.com")
     {
-        var now = DateTime.UtcNow;
+        DateTime now = DateTime.UtcNow;
         var user = new User
         {
             Id = Guid.CreateVersion7().ToString(),
@@ -139,7 +139,7 @@ internal sealed class ServiceTestFixture : IDisposable
     /// </summary>
     public async Task<User> SeedUserWithNullPasswordHashAsync(string email = "nohash@test.com")
     {
-        var now = DateTime.UtcNow;
+        DateTime now = DateTime.UtcNow;
         var user = new User
         {
             Id = Guid.CreateVersion7().ToString(),

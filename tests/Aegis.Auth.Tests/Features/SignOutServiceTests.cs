@@ -44,7 +44,7 @@ public sealed class SignOutServiceTests : IDisposable
     {
         var input = new SignOutInput { Token = "non-existent-token" };
 
-        var result = await _sut.SignOut(input);
+        Result result = await _sut.SignOut(input);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(AuthErrors.Session.SessionNotFound);
@@ -55,7 +55,7 @@ public sealed class SignOutServiceTests : IDisposable
     {
         var input = new SignOutInput { Token = string.Empty };
 
-        var result = await _sut.SignOut(input);
+        Result result = await _sut.SignOut(input);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(AuthErrors.Session.SessionNotFound);
@@ -66,7 +66,7 @@ public sealed class SignOutServiceTests : IDisposable
     {
         var input = new SignOutInput { Token = "   " };
 
-        var result = await _sut.SignOut(input);
+        Result result = await _sut.SignOut(input);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(AuthErrors.Session.SessionNotFound);
@@ -79,8 +79,8 @@ public sealed class SignOutServiceTests : IDisposable
     [Fact]
     public async Task SignOut_ValidToken_CallsRevokeSessionAsync()
     {
-        var (user, _) = await _fixture.SeedUserAsync();
-        var session = await SeedSessionAsync(user, "valid-token-123");
+        (User? user, Account _) = await _fixture.SeedUserAsync();
+        Session session = await SeedSessionAsync(user, "valid-token-123");
         SessionDeleteInput? captured = null;
 
         _sessionMock
@@ -88,7 +88,7 @@ public sealed class SignOutServiceTests : IDisposable
             .Callback<SessionDeleteInput>(i => captured = i)
             .ReturnsAsync(Result.Success());
 
-        var result = await _sut.SignOut(new SignOutInput { Token = "valid-token-123" });
+        Result result = await _sut.SignOut(new SignOutInput { Token = "valid-token-123" });
 
         result.IsSuccess.Should().BeTrue();
         captured.Should().NotBeNull();
@@ -99,14 +99,14 @@ public sealed class SignOutServiceTests : IDisposable
     [Fact]
     public async Task SignOut_RevokeSessionFails_PropagatesFailure()
     {
-        var (user, _) = await _fixture.SeedUserAsync();
+        (User? user, Account _) = await _fixture.SeedUserAsync();
         await SeedSessionAsync(user, "fail-token");
 
         _sessionMock
             .Setup(s => s.RevokeSessionAsync(It.IsAny<SessionDeleteInput>()))
             .ReturnsAsync(Result.Failure(AuthErrors.System.InternalError, "Cache unavailable"));
 
-        var result = await _sut.SignOut(new SignOutInput { Token = "fail-token" });
+        Result result = await _sut.SignOut(new SignOutInput { Token = "fail-token" });
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(AuthErrors.System.InternalError);
@@ -119,10 +119,10 @@ public sealed class SignOutServiceTests : IDisposable
     [Fact]
     public async Task SignOut_TokenOffByOneChar_ReturnsSessionNotFound()
     {
-        var (user, _) = await _fixture.SeedUserAsync();
+        (User? user, Account _) = await _fixture.SeedUserAsync();
         await SeedSessionAsync(user, "exact-token-value");
 
-        var result = await _sut.SignOut(new SignOutInput { Token = "exact-token-valuX" });
+        Result result = await _sut.SignOut(new SignOutInput { Token = "exact-token-valuX" });
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(AuthErrors.Session.SessionNotFound);
@@ -131,10 +131,10 @@ public sealed class SignOutServiceTests : IDisposable
     [Fact]
     public async Task SignOut_TokenWithTrailingNull_ReturnsSessionNotFound()
     {
-        var (user, _) = await _fixture.SeedUserAsync();
+        (User? user, Account _) = await _fixture.SeedUserAsync();
         await SeedSessionAsync(user, "clean-token");
 
-        var result = await _sut.SignOut(new SignOutInput { Token = "clean-token\0" });
+        Result result = await _sut.SignOut(new SignOutInput { Token = "clean-token\0" });
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(AuthErrors.Session.SessionNotFound);
@@ -143,7 +143,7 @@ public sealed class SignOutServiceTests : IDisposable
     [Fact]
     public async Task SignOut_TokenWithSqlInjection_ReturnsSessionNotFound()
     {
-        var result = await _sut.SignOut(new SignOutInput { Token = "'; DROP TABLE Sessions;--" });
+        Result result = await _sut.SignOut(new SignOutInput { Token = "'; DROP TABLE Sessions;--" });
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(AuthErrors.Session.SessionNotFound);
@@ -156,7 +156,7 @@ public sealed class SignOutServiceTests : IDisposable
     [Fact]
     public async Task SignOut_SameTokenTwice_SecondCallReturnsSessionNotFound()
     {
-        var (user, _) = await _fixture.SeedUserAsync();
+        (User? user, Account _) = await _fixture.SeedUserAsync();
         await SeedSessionAsync(user, "one-time-token");
 
         _sessionMock
@@ -165,7 +165,7 @@ public sealed class SignOutServiceTests : IDisposable
             .Callback<SessionDeleteInput>(async i =>
             {
                 // Simulate the session being deleted from DB by the service
-                var dbSession = await _fixture.DbContext.Sessions.FirstOrDefaultAsync(s => s.Token == i.Token);
+                Session? dbSession = await _fixture.DbContext.Sessions.FirstOrDefaultAsync(s => s.Token == i.Token);
                 if (dbSession is not null)
                 {
                     _fixture.DbContext.Sessions.Remove(dbSession);
@@ -173,8 +173,8 @@ public sealed class SignOutServiceTests : IDisposable
                 }
             });
 
-        var first = await _sut.SignOut(new SignOutInput { Token = "one-time-token" });
-        var second = await _sut.SignOut(new SignOutInput { Token = "one-time-token" });
+        Result first = await _sut.SignOut(new SignOutInput { Token = "one-time-token" });
+        Result second = await _sut.SignOut(new SignOutInput { Token = "one-time-token" });
 
         first.IsSuccess.Should().BeTrue();
         second.IsSuccess.Should().BeFalse();
@@ -190,7 +190,7 @@ public sealed class SignOutServiceTests : IDisposable
     {
         var megaToken = new string('A', 1_000_000); // 1MB token
 
-        var result = await _sut.SignOut(new SignOutInput { Token = megaToken });
+        Result result = await _sut.SignOut(new SignOutInput { Token = megaToken });
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(AuthErrors.Session.SessionNotFound);
@@ -203,7 +203,7 @@ public sealed class SignOutServiceTests : IDisposable
     [Fact]
     public async Task SignOut_SessionUserIsLoadedForRevokeInput()
     {
-        var (user, _) = await _fixture.SeedUserAsync(email: "loadtest@test.com");
+        (User? user, Account _) = await _fixture.SeedUserAsync(email: "loadtest@test.com");
         await SeedSessionAsync(user, "user-token");
 
         _sessionMock
@@ -211,7 +211,7 @@ public sealed class SignOutServiceTests : IDisposable
                 i => i.User != null && i.User.Id == user.Id)))
             .ReturnsAsync(Result.Success());
 
-        var result = await _sut.SignOut(new SignOutInput { Token = "user-token" });
+        Result result = await _sut.SignOut(new SignOutInput { Token = "user-token" });
 
         result.IsSuccess.Should().BeTrue();
         _sessionMock.Verify(

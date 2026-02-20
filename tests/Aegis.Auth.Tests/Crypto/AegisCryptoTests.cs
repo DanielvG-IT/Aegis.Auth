@@ -298,7 +298,7 @@ public sealed class AegisCryptoTests
     [Fact]
     public void RandomStringGenerator_ZeroLength_Throws()
     {
-        var act = () => AegisCrypto.RandomStringGenerator(0, "a-z");
+        Func<string> act = () => AegisCrypto.RandomStringGenerator(0, "a-z");
 
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
@@ -306,7 +306,7 @@ public sealed class AegisCryptoTests
     [Fact]
     public void RandomStringGenerator_NegativeLength_Throws()
     {
-        var act = () => AegisCrypto.RandomStringGenerator(-1, "a-z");
+        Func<string> act = () => AegisCrypto.RandomStringGenerator(-1, "a-z");
 
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
@@ -314,7 +314,7 @@ public sealed class AegisCryptoTests
     [Fact]
     public void RandomStringGenerator_InvalidAlphabet_Throws()
     {
-        var act = () => AegisCrypto.RandomStringGenerator(10, "nonexistent-alphabet");
+        Func<string> act = () => AegisCrypto.RandomStringGenerator(10, "nonexistent-alphabet");
 
         act.Should().Throw<ArgumentException>();
     }
