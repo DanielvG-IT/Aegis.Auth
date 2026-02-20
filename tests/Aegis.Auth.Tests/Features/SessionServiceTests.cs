@@ -81,9 +81,9 @@ public sealed class SessionServiceTests : IDisposable
     [Fact]
     public async Task CreateSession_ValidInput_ReturnsSession()
     {
-        var user = CreateTestUser();
+        User user = CreateTestUser();
 
-        var result = await _sut.CreateSessionAsync(CreateInput(user));
+        Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user));
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeNull();
@@ -94,9 +94,9 @@ public sealed class SessionServiceTests : IDisposable
     [Fact]
     public async Task CreateSession_TokenIsExactly32Chars()
     {
-        var user = CreateTestUser();
+        User user = CreateTestUser();
 
-        var result = await _sut.CreateSessionAsync(CreateInput(user));
+        Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user));
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.Token.Should().HaveLength(32);
@@ -105,9 +105,9 @@ public sealed class SessionServiceTests : IDisposable
     [Fact]
     public async Task CreateSession_TokenContainsOnlyAlphanumericChars()
     {
-        var user = CreateTestUser();
+        User user = CreateTestUser();
 
-        var result = await _sut.CreateSessionAsync(CreateInput(user));
+        Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user));
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.Token.Should().MatchRegex("^[a-zA-Z0-9]+$");
@@ -116,10 +116,10 @@ public sealed class SessionServiceTests : IDisposable
     [Fact]
     public async Task CreateSession_TwoSessionsGetDifferentTokens()
     {
-        var user = CreateTestUser();
+        User user = CreateTestUser();
 
-        var result1 = await _sut.CreateSessionAsync(CreateInput(user));
-        var result2 = await _sut.CreateSessionAsync(CreateInput(user));
+        Result<Session> result1 = await _sut.CreateSessionAsync(CreateInput(user));
+        Result<Session> result2 = await _sut.CreateSessionAsync(CreateInput(user));
 
         result1.Value!.Token.Should().NotBe(result2.Value!.Token,
             "each session must get a unique token");
@@ -128,10 +128,10 @@ public sealed class SessionServiceTests : IDisposable
     [Fact]
     public async Task CreateSession_TwoSessionsGetDifferentIds()
     {
-        var user = CreateTestUser();
+        User user = CreateTestUser();
 
-        var result1 = await _sut.CreateSessionAsync(CreateInput(user));
-        var result2 = await _sut.CreateSessionAsync(CreateInput(user));
+        Result<Session> result1 = await _sut.CreateSessionAsync(CreateInput(user));
+        Result<Session> result2 = await _sut.CreateSessionAsync(CreateInput(user));
 
         result1.Value!.Id.Should().NotBe(result2.Value!.Id);
     }
@@ -143,13 +143,13 @@ public sealed class SessionServiceTests : IDisposable
     [Fact]
     public async Task CreateSession_DontRememberMe_ExpiresInOneDay()
     {
-        var user = CreateTestUser();
-        var before = DateTime.UtcNow;
+        User user = CreateTestUser();
+        DateTime before = DateTime.UtcNow;
 
-        var result = await _sut.CreateSessionAsync(CreateInput(user, dontRemember: true));
+        Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user, dontRemember: true));
 
         result.IsSuccess.Should().BeTrue();
-        var expectedExpiry = before.AddDays(1);
+        DateTime expectedExpiry = before.AddDays(1);
         result.Value!.ExpiresAt.Should().BeCloseTo(expectedExpiry, TimeSpan.FromSeconds(5));
     }
 
@@ -157,13 +157,13 @@ public sealed class SessionServiceTests : IDisposable
     public async Task CreateSession_RememberMe_ExpiresAtConfiguredDuration()
     {
         _fixture.Options.Session.ExpiresIn = 3600; // 1 hour
-        var user = CreateTestUser();
-        var before = DateTime.UtcNow;
+        User user = CreateTestUser();
+        DateTime before = DateTime.UtcNow;
 
-        var result = await _sut.CreateSessionAsync(CreateInput(user, dontRemember: false));
+        Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user, dontRemember: false));
 
         result.IsSuccess.Should().BeTrue();
-        var expectedExpiry = before.AddSeconds(3600);
+        DateTime expectedExpiry = before.AddSeconds(3600);
         result.Value!.ExpiresAt.Should().BeCloseTo(expectedExpiry, TimeSpan.FromSeconds(5));
     }
 
@@ -171,13 +171,13 @@ public sealed class SessionServiceTests : IDisposable
     public async Task CreateSession_ExpiresInZero_UsesDefault7Days()
     {
         _fixture.Options.Session.ExpiresIn = 0;
-        var user = CreateTestUser();
-        var before = DateTime.UtcNow;
+        User user = CreateTestUser();
+        DateTime before = DateTime.UtcNow;
 
-        var result = await _sut.CreateSessionAsync(CreateInput(user, dontRemember: false));
+        Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user, dontRemember: false));
 
         result.IsSuccess.Should().BeTrue();
-        var expectedExpiry = before.AddSeconds(604800); // 7 days default
+        DateTime expectedExpiry = before.AddSeconds(604800); // 7 days default
         result.Value!.ExpiresAt.Should().BeCloseTo(expectedExpiry, TimeSpan.FromSeconds(5));
     }
 
@@ -189,12 +189,12 @@ public sealed class SessionServiceTests : IDisposable
     public async Task CreateSession_StoreInDatabase_PersistsSession()
     {
         _fixture.Options.Session.StoreSessionInDatabase = true;
-        var user = CreateTestUser();
+        User user = CreateTestUser();
 
-        var result = await _sut.CreateSessionAsync(CreateInput(user));
+        Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user));
 
         result.IsSuccess.Should().BeTrue();
-        var dbSession = _fixture.DbContext.Sessions.SingleOrDefault(s => s.Id == result.Value!.Id);
+        Session? dbSession = _fixture.DbContext.Sessions.SingleOrDefault(s => s.Id == result.Value!.Id);
         dbSession.Should().NotBeNull();
         dbSession!.Token.Should().Be(result.Value!.Token);
     }
@@ -206,9 +206,9 @@ public sealed class SessionServiceTests : IDisposable
     [Fact]
     public async Task CreateSession_WithCache_StoresSessionInCache()
     {
-        var user = CreateTestUser();
+        User user = CreateTestUser();
 
-        var result = await _sut.CreateSessionAsync(CreateInput(user));
+        Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user));
 
         result.IsSuccess.Should().BeTrue();
         // The cache should have the session token as a key
@@ -218,7 +218,7 @@ public sealed class SessionServiceTests : IDisposable
     [Fact]
     public async Task CreateSession_WithCache_StoresRegistryForUser()
     {
-        var user = CreateTestUser();
+        User user = CreateTestUser();
 
         await _sut.CreateSessionAsync(CreateInput(user));
 
@@ -229,9 +229,9 @@ public sealed class SessionServiceTests : IDisposable
     [Fact]
     public async Task CreateSession_WithCache_RegistryContainsNewSession()
     {
-        var user = CreateTestUser();
+        User user = CreateTestUser();
 
-        var result = await _sut.CreateSessionAsync(CreateInput(user));
+        Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user));
 
         var registryKey = $"active-sessions-{user.Id}";
         _cacheStore.Should().ContainKey(registryKey);
@@ -242,14 +242,14 @@ public sealed class SessionServiceTests : IDisposable
     [Fact]
     public async Task CreateSession_MultipleSessions_RegistryContainsAll()
     {
-        var user = CreateTestUser();
+        User user = CreateTestUser();
 
-        var r1 = await _sut.CreateSessionAsync(CreateInput(user));
-        var r2 = await _sut.CreateSessionAsync(CreateInput(user));
+        Result<Session> r1 = await _sut.CreateSessionAsync(CreateInput(user));
+        Result<Session> r2 = await _sut.CreateSessionAsync(CreateInput(user));
 
         var registryKey = $"active-sessions-{user.Id}";
         var registryJson = _cacheStore[registryKey].Value;
-        var registry = JsonSerializer.Deserialize<List<JsonElement>>(registryJson)!;
+        List<JsonElement> registry = JsonSerializer.Deserialize<List<JsonElement>>(registryJson)!;
         registry.Count.Should().BeGreaterThanOrEqualTo(2);
         registryJson.Should().Contain(r1.Value!.Token);
         registryJson.Should().Contain(r2.Value!.Token);
@@ -268,8 +268,8 @@ public sealed class SessionServiceTests : IDisposable
             _fixture.DbContext,
             disCache: null);
 
-        var user = CreateTestUser();
-        var result = await noCacheSut.CreateSessionAsync(CreateInput(user));
+        User user = CreateTestUser();
+        Result<Session> result = await noCacheSut.CreateSessionAsync(CreateInput(user));
 
         result.IsSuccess.Should().BeTrue();
         _fixture.DbContext.Sessions.Should().Contain(s => s.Id == result.Value!.Id);
@@ -282,10 +282,10 @@ public sealed class SessionServiceTests : IDisposable
     [Fact]
     public async Task RevokeSession_ValidToken_ReturnsSuccess()
     {
-        var user = CreateTestUser();
-        var session = await CreateAndPersistSessionAsync(user);
+        User user = CreateTestUser();
+        Session session = await CreateAndPersistSessionAsync(user);
 
-        var result = await _sut.RevokeSessionAsync(new SessionDeleteInput
+        Result result = await _sut.RevokeSessionAsync(new SessionDeleteInput
         {
             User = user,
             Token = session.Token,
@@ -297,8 +297,8 @@ public sealed class SessionServiceTests : IDisposable
     [Fact]
     public async Task RevokeSession_RemovesFromCache()
     {
-        var user = CreateTestUser();
-        var session = await CreateAndPersistSessionAsync(user);
+        User user = CreateTestUser();
+        Session session = await CreateAndPersistSessionAsync(user);
         _cacheStore.Should().ContainKey(session.Token);
 
         await _sut.RevokeSessionAsync(new SessionDeleteInput
@@ -313,8 +313,8 @@ public sealed class SessionServiceTests : IDisposable
     [Fact]
     public async Task RevokeSession_RemovesFromDatabase()
     {
-        var user = CreateTestUser();
-        var session = await CreateAndPersistSessionAsync(user);
+        User user = CreateTestUser();
+        Session session = await CreateAndPersistSessionAsync(user);
 
         await _sut.RevokeSessionAsync(new SessionDeleteInput
         {
@@ -328,8 +328,8 @@ public sealed class SessionServiceTests : IDisposable
     [Fact]
     public async Task RevokeSession_RemovesFromRegistry()
     {
-        var user = CreateTestUser();
-        var session = await CreateAndPersistSessionAsync(user);
+        User user = CreateTestUser();
+        Session session = await CreateAndPersistSessionAsync(user);
         var registryKey = $"active-sessions-{user.Id}";
         _cacheStore.Should().ContainKey(registryKey);
 
@@ -354,11 +354,11 @@ public sealed class SessionServiceTests : IDisposable
     [Fact]
     public async Task RevokeAllSessions_RemovesAllFromCacheAndDb()
     {
-        var user = CreateTestUser();
-        var s1 = await CreateAndPersistSessionAsync(user);
-        var s2 = await CreateAndPersistSessionAsync(user);
+        User user = CreateTestUser();
+        Session s1 = await CreateAndPersistSessionAsync(user);
+        Session s2 = await CreateAndPersistSessionAsync(user);
 
-        var result = await _sut.RevokeAllSessionsAsync(user.Id);
+        Result result = await _sut.RevokeAllSessionsAsync(user.Id);
 
         result.IsSuccess.Should().BeTrue();
 
@@ -376,9 +376,9 @@ public sealed class SessionServiceTests : IDisposable
     [Fact]
     public async Task RevokeAllSessions_NoSessions_StillReturnsSuccess()
     {
-        var user = CreateTestUser();
+        User user = CreateTestUser();
 
-        var result = await _sut.RevokeAllSessionsAsync(user.Id);
+        Result result = await _sut.RevokeAllSessionsAsync(user.Id);
 
         result.IsSuccess.Should().BeTrue();
     }
@@ -386,11 +386,11 @@ public sealed class SessionServiceTests : IDisposable
     [Fact]
     public async Task RevokeAllSessions_DoesNotAffectOtherUsers()
     {
-        var user1 = CreateTestUser("user-1");
-        var user2 = CreateTestUser("user-2");
+        User user1 = CreateTestUser("user-1");
+        User user2 = CreateTestUser("user-2");
 
-        var s1 = await CreateAndPersistSessionAsync(user1);
-        var s2 = await CreateAndPersistSessionAsync(user2);
+        Session s1 = await CreateAndPersistSessionAsync(user1);
+        Session s2 = await CreateAndPersistSessionAsync(user2);
 
         await _sut.RevokeAllSessionsAsync(user1.Id);
 
@@ -409,11 +409,11 @@ public sealed class SessionServiceTests : IDisposable
     [Fact]
     public async Task CreateSession_TimestampsAreUtcNow()
     {
-        var user = CreateTestUser();
-        var before = DateTime.UtcNow.AddSeconds(-1);
+        User user = CreateTestUser();
+        DateTime before = DateTime.UtcNow.AddSeconds(-1);
 
-        var result = await _sut.CreateSessionAsync(CreateInput(user));
-        var after = DateTime.UtcNow.AddSeconds(1);
+        Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user));
+        DateTime after = DateTime.UtcNow.AddSeconds(1);
 
         result.Value!.CreatedAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
         result.Value.UpdatedAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
@@ -422,7 +422,7 @@ public sealed class SessionServiceTests : IDisposable
     [Fact]
     public async Task CreateSession_IpAddressAndUserAgentStored()
     {
-        var user = CreateTestUser();
+        User user = CreateTestUser();
         var input = new SessionCreateInput
         {
             User = user,
@@ -431,7 +431,7 @@ public sealed class SessionServiceTests : IDisposable
             UserAgent = "CustomBot/2.0",
         };
 
-        var result = await _sut.CreateSessionAsync(input);
+        Result<Session> result = await _sut.CreateSessionAsync(input);
 
         result.Value!.IpAddress.Should().Be("203.0.113.42");
         result.Value.UserAgent.Should().Be("CustomBot/2.0");
@@ -445,9 +445,9 @@ public sealed class SessionServiceTests : IDisposable
     public async Task CreateSession_ExpiresInOneSecond_SessionStillCreated()
     {
         _fixture.Options.Session.ExpiresIn = 1;
-        var user = CreateTestUser();
+        User user = CreateTestUser();
 
-        var result = await _sut.CreateSessionAsync(CreateInput(user, dontRemember: false));
+        Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user, dontRemember: false));
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.ExpiresAt.Should().BeCloseTo(DateTime.UtcNow.AddSeconds(1), TimeSpan.FromSeconds(3));
@@ -479,7 +479,7 @@ public sealed class SessionServiceTests : IDisposable
             .Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns<string, CancellationToken>((key, _) =>
             {
-                if (_cacheStore.TryGetValue(key, out var entry))
+                if (_cacheStore.TryGetValue(key, out (string Value, DateTimeOffset? Expiry) entry))
                 {
                     // Simulate expiry
                     if (entry.Expiry.HasValue && entry.Expiry.Value <= DateTimeOffset.UtcNow)
@@ -512,7 +512,7 @@ public sealed class SessionServiceTests : IDisposable
 
         // Pass a cloned (untracked) user to avoid EF navigation cycles
         // that cause JsonSerializer circular reference errors
-        var result = await _sut.CreateSessionAsync(CreateInput(user));
+        Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user));
         result.IsSuccess.Should().BeTrue();
         return result.Value!;
     }

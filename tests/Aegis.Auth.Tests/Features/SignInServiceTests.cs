@@ -56,7 +56,7 @@ public sealed class SignInServiceTests : IDisposable
     {
         _fixture.Options.EmailAndPassword.Enabled = false;
 
-        var result = await _sut.SignInEmail(ValidInput());
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput());
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(AuthErrors.System.FeatureDisabled);
@@ -69,7 +69,7 @@ public sealed class SignInServiceTests : IDisposable
         await _fixture.SeedUserAsync();
 
         // Seed a user to show the outcome is independent of existing DB state
-        var result = await _sut.SignInEmail(ValidInput());
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput());
         result.ErrorCode.Should().Be(AuthErrors.System.FeatureDisabled);
     }
 
@@ -85,7 +85,7 @@ public sealed class SignInServiceTests : IDisposable
     [InlineData("\r\n")]
     public async Task SignInEmail_WithNullOrWhitespaceEmail_ReturnsInvalidInput(string? email)
     {
-        var result = await _sut.SignInEmail(ValidInput(email: email!));
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: email!));
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(AuthErrors.Validation.InvalidInput);
@@ -103,7 +103,7 @@ public sealed class SignInServiceTests : IDisposable
     [InlineData("<script>alert(1)</script>@xss.com")]
     public async Task SignInEmail_WithMalformedEmail_ReturnsInvalidInput(string email)
     {
-        var result = await _sut.SignInEmail(ValidInput(email: email));
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: email));
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(AuthErrors.Validation.InvalidInput);
@@ -118,7 +118,7 @@ public sealed class SignInServiceTests : IDisposable
     [Fact]
     public async Task SignInEmail_NonExistentUser_ReturnsInvalidEmailOrPassword()
     {
-        var result = await _sut.SignInEmail(ValidInput(email: "ghost@test.com"));
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: "ghost@test.com"));
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(AuthErrors.Identity.InvalidEmailOrPassword);
@@ -146,7 +146,7 @@ public sealed class SignInServiceTests : IDisposable
     {
         await _fixture.SeedUserAsync(email: "user@test.com", password: "CorrectPassword123!");
 
-        var result = await _sut.SignInEmail(ValidInput(email: "user@test.com", password: "WrongPassword"));
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: "user@test.com", password: "WrongPassword"));
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(AuthErrors.Identity.InvalidEmailOrPassword);
@@ -157,8 +157,8 @@ public sealed class SignInServiceTests : IDisposable
     {
         await _fixture.SeedUserAsync(email: "real@test.com", password: "RealPass123!");
 
-        var nonExistent = await _sut.SignInEmail(ValidInput(email: "fake@test.com"));
-        var wrongPassword = await _sut.SignInEmail(ValidInput(email: "real@test.com", password: "WrongOne"));
+        Result<SignInResult> nonExistent = await _sut.SignInEmail(ValidInput(email: "fake@test.com"));
+        Result<SignInResult> wrongPassword = await _sut.SignInEmail(ValidInput(email: "real@test.com", password: "WrongOne"));
 
         // Both must return identical error codes — no information leakage
         nonExistent.ErrorCode.Should().Be(wrongPassword.ErrorCode,
@@ -175,7 +175,7 @@ public sealed class SignInServiceTests : IDisposable
         // User exists via Google OAuth but has no "credential" provider
         await _fixture.SeedOAuthOnlyUserAsync(email: "oauth@test.com");
 
-        var result = await _sut.SignInEmail(ValidInput(email: "oauth@test.com", password: "anything"));
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: "oauth@test.com", password: "anything"));
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(AuthErrors.Identity.InvalidEmailOrPassword);
@@ -190,7 +190,7 @@ public sealed class SignInServiceTests : IDisposable
     {
         await _fixture.SeedUserWithNullPasswordHashAsync(email: "nohash@test.com");
 
-        var result = await _sut.SignInEmail(ValidInput(email: "nohash@test.com", password: "anything"));
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: "nohash@test.com", password: "anything"));
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(AuthErrors.Identity.InvalidEmailOrPassword);
@@ -222,7 +222,7 @@ public sealed class SignInServiceTests : IDisposable
         await _fixture.SeedUserAsync(email: "casetest@test.com", password: "Password123!");
         SetupSessionMock();
 
-        var result = await _sut.SignInEmail(ValidInput(email: "CaseTest@TEST.COM", password: "Password123!"));
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: "CaseTest@TEST.COM", password: "Password123!"));
 
         result.IsSuccess.Should().BeTrue();
     }
@@ -233,7 +233,7 @@ public sealed class SignInServiceTests : IDisposable
         await _fixture.SeedUserAsync(email: "trim@test.com", password: "Password123!");
         SetupSessionMock();
 
-        var result = await _sut.SignInEmail(ValidInput(email: "  trim@test.com  ", password: "Password123!"));
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: "  trim@test.com  ", password: "Password123!"));
 
         result.IsSuccess.Should().BeTrue();
     }
@@ -248,7 +248,7 @@ public sealed class SignInServiceTests : IDisposable
         await _fixture.SeedUserAsync(email: "valid@test.com", password: "CorrectPass!");
         SetupSessionMock();
 
-        var result = await _sut.SignInEmail(ValidInput(email: "valid@test.com", password: "CorrectPass!"));
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: "valid@test.com", password: "CorrectPass!"));
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.User.Email.Should().Be("valid@test.com");
@@ -271,7 +271,7 @@ public sealed class SignInServiceTests : IDisposable
             Callback = "https://app.example.com/dashboard"
         };
 
-        var result = await _sut.SignInEmail(input);
+        Result<SignInResult> result = await _sut.SignInEmail(input);
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.CallbackUrl.Should().Be("https://app.example.com/dashboard");
@@ -321,7 +321,7 @@ public sealed class SignInServiceTests : IDisposable
             .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>()))
             .ReturnsAsync(Result<Session>.Failure(AuthErrors.System.InternalError, "Boom"));
 
-        var result = await _sut.SignInEmail(ValidInput(email: "sessionfail@test.com", password: "Password!"));
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: "sessionfail@test.com", password: "Password!"));
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(AuthErrors.System.FailedToCreateSession);
@@ -369,7 +369,7 @@ public sealed class SignInServiceTests : IDisposable
         _fixture.Options.EmailAndPassword.Password.Verify = _ => Task.FromResult(true);
         SetupSessionMock();
 
-        var result = await _sut.SignInEmail(ValidInput(email: "alwaystrue@test.com", password: "literally-anything"));
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: "alwaystrue@test.com", password: "literally-anything"));
 
         result.IsSuccess.Should().BeTrue("the verifier accepted the password");
     }
@@ -380,7 +380,7 @@ public sealed class SignInServiceTests : IDisposable
         await _fixture.SeedUserAsync(email: "alwaysfalse@test.com", password: "CorrectPassword!");
         _fixture.Options.EmailAndPassword.Password.Verify = _ => Task.FromResult(false);
 
-        var result = await _sut.SignInEmail(ValidInput(email: "alwaysfalse@test.com", password: "CorrectPassword!"));
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: "alwaysfalse@test.com", password: "CorrectPassword!"));
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(AuthErrors.Identity.InvalidEmailOrPassword);
