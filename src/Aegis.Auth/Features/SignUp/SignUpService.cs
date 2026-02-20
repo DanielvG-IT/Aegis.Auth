@@ -17,6 +17,7 @@ namespace Aegis.Auth.Features.SignUp
         Task<Result<SignUpResult>> SignUpEmail(SignUpEmailInput input);
     }
 
+    // TODO Figure out why this is a partial class!
     internal sealed partial class SignUpService(AegisAuthOptions options, ILoggerFactory loggerFactory, IAuthDbContext dbContext, ISessionService sessionService) : ISignUpService
     {
         private readonly IAuthDbContext _db = dbContext;

@@ -18,6 +18,8 @@ namespace Aegis.Auth.Options
         // public EmailVerificationOptions? EmailVerification { get; set; }
         // ═══════════════════════════════════════════════════════════════════════════════
 
+        public SocialProvidersOptions? SocialProviders { get; set; } = null;
+
         public SessionOptions Session { get; set; } = new();
     }
 

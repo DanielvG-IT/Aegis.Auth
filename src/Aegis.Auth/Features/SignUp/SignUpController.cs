@@ -7,12 +7,12 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Aegis.Auth.Features.SignUp
 {
-
     [ApiController]
     [Route("api/auth")]
     public sealed class SignUpController(ISignUpService signUpService, SessionCookieHandler cookieManager, AegisAuthOptions options) : AegisControllerBase
     {
         private readonly SessionCookieHandler _cookieManager = cookieManager;
+        private readonly ISignUpService _signUpService = signUpService;
         private readonly AegisAuthOptions _options = options;
 
         [HttpPost("sign-up/email")]
@@ -30,7 +30,7 @@ namespace Aegis.Auth.Features.SignUp
                 UserAgent = HttpContext.Request.Headers.UserAgent.ToString() ?? "unknown",
                 IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             };
-            Result<SignUpResult> result = await signUpService.SignUpEmail(emailInput);
+            Result<SignUpResult> result = await _signUpService.SignUpEmail(emailInput);
             if (result.IsSuccess is false || result.Value is null)
                 return HandleResult(result);
 
