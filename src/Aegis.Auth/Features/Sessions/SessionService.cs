@@ -116,7 +116,7 @@ namespace Aegis.Auth.Features.Sessions
                             var verifyJson = await _cache.GetStringAsync(registryKey);
                             if (!string.IsNullOrWhiteSpace(verifyJson))
                             {
-                                var verifyList = JsonSerializer.Deserialize<List<SessionReference>>(verifyJson);
+                                List<SessionReference>? verifyList = JsonSerializer.Deserialize<List<SessionReference>>(verifyJson);
                                 if (verifyList?.Any(s => s.Token == data.Token) == true)
                                 {
                                     registryUpdated = true;

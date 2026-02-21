@@ -1,12 +1,15 @@
 using Aegis.Auth.Abstractions;
+using Aegis.Auth.Infrastructure.Authentication;
 using Aegis.Auth.Infrastructure.Cookies;
 
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Aegis.Auth.Features.SignOut
 {
     [ApiController]
     [Route("api/auth")]
+    [Authorize(AuthenticationSchemes = AegisAuthenticationDefaults.AuthenticationScheme)]
     public sealed class SignOutController(ISignOutService signOutService, SessionCookieHandler cookieHandler) : AegisControllerBase
     {
         private readonly SessionCookieHandler _cookieHandler = cookieHandler;

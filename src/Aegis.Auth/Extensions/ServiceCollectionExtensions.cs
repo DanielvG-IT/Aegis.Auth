@@ -3,9 +3,11 @@ using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Features.SignIn;
 using Aegis.Auth.Features.SignOut;
 using Aegis.Auth.Features.SignUp;
+using Aegis.Auth.Infrastructure.Authentication;
 using Aegis.Auth.Infrastructure.Cookies;
 using Aegis.Auth.Options;
 
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -40,6 +42,22 @@ namespace Aegis.Auth.Extensions
             services.AddScoped<ISignUpService, SignUpService>();
             services.AddScoped<ISignOutService, SignOutService>();
 
+            return services;
+        }
+
+        public static IServiceCollection AddAegisAuthAuthentication(
+            this IServiceCollection services,
+            string authenticationScheme = AegisAuthenticationDefaults.AuthenticationScheme)
+        {
+            services
+                .AddAuthentication(options =>
+                {
+                    options.DefaultAuthenticateScheme = authenticationScheme;
+                    options.DefaultChallengeScheme = authenticationScheme;
+                })
+                .AddScheme<AuthenticationSchemeOptions, AegisAuthenticationHandler>(authenticationScheme, _ => { });
+
+            services.AddAuthorization();
             return services;
         }
     }
