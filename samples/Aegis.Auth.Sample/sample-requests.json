@@ -80,5 +80,28 @@
             "rememberMe": false,
             "callback": null
         }
+    },
+    "getMyProjects": {
+        "description": "Fetch projects for currently signed-in user",
+        "endpoint": "GET /api/projects/my"
+    },
+    "createProject": {
+        "description": "Create a new business project for signed-in user",
+        "endpoint": "POST /api/projects",
+        "request": {
+            "name": "Aegis API Integration",
+            "description": "Use Aegis-authenticated endpoints in a real app workflow"
+        }
+    },
+    "getProjectTasks": {
+        "description": "List tasks in a project owned by the signed-in user",
+        "endpoint": "GET /api/projects/{projectId}/tasks"
+    },
+    "addTask": {
+        "description": "Add a task to a project owned by the signed-in user",
+        "endpoint": "POST /api/projects/{projectId}/tasks",
+        "request": {
+            "title": "Hook dashboard to authenticated project API"
+        }
     }
 }

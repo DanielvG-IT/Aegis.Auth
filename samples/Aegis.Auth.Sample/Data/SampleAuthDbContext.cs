@@ -1,5 +1,7 @@
-using Aegis.Auth.Abstractions;
 using Aegis.Auth.Entities;
+using Aegis.Auth.Extensions;
+using Aegis.Auth.Abstractions;
+using Aegis.Auth.Sample.Entities;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -7,66 +9,54 @@ namespace Aegis.Auth.Sample.Data;
 
 public class SampleAuthDbContext(DbContextOptions<SampleAuthDbContext> options) : DbContext(options), IAuthDbContext
 {
-    public DbSet<User> Users { get; set; } = null!;
+    public DbSet<AppUser> Users { get; set; } = null!;
     public DbSet<Account> Accounts { get; set; } = null!;
     public DbSet<Session> Sessions { get; set; } = null!;
+    public DbSet<Project> Projects { get; set; } = null!;
+    public DbSet<ProjectTask> ProjectTasks { get; set; } = null!;
 
-    // ═══════════════════════════════════════════════════════════════════════════════
-    // EMAIL VERIFICATION - DISABLED FOR v0.1, WILL BE RE-ENABLED IN v0.2
-    // ═══════════════════════════════════════════════════════════════════════════════
-    // TODO v0.2: Uncomment this for email verification support
-    // public DbSet<Verification> Verifications { get; set; } = null!;
-    // ═══════════════════════════════════════════════════════════════════════════════
+    DbSet<User> IAuthDbContext.Users => Set<User>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // User configuration
-        modelBuilder.Entity<User>(entity =>
+        modelBuilder.ApplyAegisAuthModel();
+
+        // Add your app-specific entity mappings below.
+        // Example: strongly typed extension of Aegis user entity.
+        modelBuilder.Entity<AppUser>(entity =>
         {
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.Email).IsUnique();
-            entity.Property(e => e.Email).IsRequired();
+            entity.HasBaseType<User>();
+            entity.Property(u => u.IsSpecial).IsRequired();
         });
 
-        // Account configuration
-        modelBuilder.Entity<Account>(entity =>
+        modelBuilder.Entity<Project>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.UserId);
-            entity.HasIndex(e => e.ProviderId);
-            entity.HasIndex(e => new { e.UserId, e.ProviderId }); // Composite index for credential lookups
-            entity.HasOne(e => e.User)
-                .WithMany(u => u.Accounts)
-                .HasForeignKey(e => e.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
+            entity.Property(e => e.Name).HasMaxLength(120).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.HasIndex(e => e.OwnerUserId);
+            entity.HasIndex(e => new { e.OwnerUserId, e.Name });
+
+            // App business tables can reference auth users directly by User.Id.
+            entity.HasOne<User>()
+              .WithMany()
+              .HasForeignKey(e => e.OwnerUserId)
+              .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // Session configuration
-        modelBuilder.Entity<Session>(entity =>
+        modelBuilder.Entity<ProjectTask>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.Token).IsUnique(); // Session lookups by token
-            entity.HasIndex(e => e.UserId); // User's sessions queries
-            entity.HasIndex(e => e.ExpiresAt); // Cleanup/expiration queries
-            entity.HasOne(e => e.User)
-                .WithMany(u => u.Sessions)
-                .HasForeignKey(e => e.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
+            entity.Property(e => e.Title).HasMaxLength(180).IsRequired();
+            entity.HasIndex(e => e.ProjectId);
+            entity.HasIndex(e => new { e.ProjectId, e.IsDone });
 
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // EMAIL VERIFICATION - DISABLED FOR v0.1, WILL BE RE-ENABLED IN v0.2
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // TODO v0.2: Uncomment this for email verification support
-        /*
-        // Verification configuration
-        modelBuilder.Entity<Verification>(entity =>
-        {
-          entity.HasKey(e => e.Id);
+            entity.HasOne(e => e.Project)
+              .WithMany(p => p.Tasks)
+              .HasForeignKey(e => e.ProjectId)
+              .OnDelete(DeleteBehavior.Cascade);
         });
-        */
-        // ═══════════════════════════════════════════════════════════════════════════════
     }
 }
