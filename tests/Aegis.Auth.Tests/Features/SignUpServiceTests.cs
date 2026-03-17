@@ -5,7 +5,7 @@ using Aegis.Auth.Features.SignUp;
 using Aegis.Auth.Options;
 using Aegis.Auth.Tests.Helpers;
 
-using FluentAssertions;
+using Microsoft.Extensions.Options;
 
 using Moq;
 
@@ -27,7 +27,7 @@ public sealed class SignUpServiceTests : IDisposable
         _fixture = new ServiceTestFixture();
         _sessionMock = new Mock<ISessionService>(MockBehavior.Strict);
         _sut = new SignUpService(
-            _fixture.Options,
+            Microsoft.Extensions.Options.Options.Create(_fixture.Options),
             _fixture.LoggerFactory,
             _fixture.DbContext,
             _sessionMock.Object);
@@ -58,8 +58,8 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput());
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(AuthErrors.System.FeatureDisabled);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.System.FeatureDisabled, result.ErrorCode);
     }
 
     [Fact]
@@ -69,8 +69,8 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput());
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(AuthErrors.System.FeatureDisabled);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.System.FeatureDisabled, result.ErrorCode);
     }
 
     [Fact]
@@ -81,8 +81,8 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput());
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(AuthErrors.System.FeatureDisabled);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.System.FeatureDisabled, result.ErrorCode);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -99,8 +99,8 @@ public sealed class SignUpServiceTests : IDisposable
     {
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput(email: email!));
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(AuthErrors.Validation.InvalidInput);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.Validation.InvalidInput, result.ErrorCode);
     }
 
     [Theory]
@@ -112,8 +112,8 @@ public sealed class SignUpServiceTests : IDisposable
     {
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput(password: password!));
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(AuthErrors.Validation.InvalidInput);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.Validation.InvalidInput, result.ErrorCode);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -131,8 +131,8 @@ public sealed class SignUpServiceTests : IDisposable
     {
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput(email: email));
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(AuthErrors.Validation.InvalidInput);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.Validation.InvalidInput, result.ErrorCode);
     }
 
     [Fact]
@@ -142,8 +142,8 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput(email: "UpperCase@TEST.COM"));
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value!.User.Email.Should().Be("uppercase@test.com");
+        Assert.True(result.IsSuccess);
+        Assert.Equal("uppercase@test.com", result.Value!.User.Email);
     }
 
     [Fact]
@@ -153,8 +153,8 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput(email: "  trimmed@test.com  "));
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value!.User.Email.Should().Be("trimmed@test.com");
+        Assert.True(result.IsSuccess);
+        Assert.Equal("trimmed@test.com", result.Value!.User.Email);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -169,8 +169,8 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput(password: shortPassword));
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(AuthErrors.Validation.PasswordTooShort);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.Validation.PasswordTooShort, result.ErrorCode);
     }
 
     [Fact]
@@ -182,7 +182,7 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput(password: exactMin));
 
-        result.IsSuccess.Should().BeTrue();
+        Assert.True(result.IsSuccess);
     }
 
     [Fact]
@@ -194,7 +194,7 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput(password: exactMax));
 
-        result.IsSuccess.Should().BeTrue();
+        Assert.True(result.IsSuccess);
     }
 
     [Fact]
@@ -205,8 +205,8 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput(password: overMax));
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(AuthErrors.Validation.PasswordTooLong);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.Validation.PasswordTooLong, result.ErrorCode);
     }
 
     [Fact]
@@ -217,8 +217,8 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput(password: megaPassword));
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(AuthErrors.Validation.PasswordTooLong);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.Validation.PasswordTooLong, result.ErrorCode);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -233,9 +233,9 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput(password: "NoDigitsHere"));
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(AuthErrors.Validation.InvalidInput);
-        result.Message.Should().Be("Password must contain a digit.");
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.Validation.InvalidInput, result.ErrorCode);
+        Assert.Equal("Password must contain a digit.", result.Message);
     }
 
     [Fact]
@@ -247,7 +247,7 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput());
 
-        result.IsSuccess.Should().BeTrue();
+        Assert.True(result.IsSuccess);
     }
 
     [Fact]
@@ -258,8 +258,8 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput());
 
-        result.IsSuccess.Should().BeFalse();
-        result.Message.Should().Be("Password validation failed.");
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Password validation failed.", result.Message);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -273,8 +273,8 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput(email: "duplicate@test.com"));
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(AuthErrors.Identity.UserAlreadyExists);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.Identity.UserAlreadyExists, result.ErrorCode);
     }
 
     [Fact]
@@ -284,8 +284,8 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput(email: "CASE@TEST.COM"));
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(AuthErrors.Identity.UserAlreadyExists);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.Identity.UserAlreadyExists, result.ErrorCode);
     }
 
     [Fact]
@@ -295,8 +295,8 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput(email: "  padded@test.com  "));
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(AuthErrors.Identity.UserAlreadyExists);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.Identity.UserAlreadyExists, result.ErrorCode);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -310,18 +310,17 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput(email: "newuser@test.com", name: "New User"));
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value!.User.Email.Should().Be("newuser@test.com");
-        result.Value.User.Name.Should().Be("New User");
-
+        Assert.True(result.IsSuccess);
+        Assert.Equal("newuser@test.com", result.Value!.User.Email);
+        Assert.Equal("New User", result.Value.User.Name);
         // Verify persisted to DB
         User? dbUser = _fixture.DbContext.Users.SingleOrDefault(u => u.Email == "newuser@test.com");
-        dbUser.Should().NotBeNull();
-
+        Assert.NotNull(dbUser);
         Account? dbAccount = _fixture.DbContext.Accounts.SingleOrDefault(a => a.UserId == dbUser!.Id);
-        dbAccount.Should().NotBeNull();
-        dbAccount!.ProviderId.Should().Be("credential");
-        dbAccount.PasswordHash.Should().NotBeNullOrWhiteSpace();
+
+        Assert.NotNull(dbAccount);
+        Assert.Equal("credential", dbAccount!.ProviderId);
+        Assert.False(string.IsNullOrWhiteSpace(dbAccount.PasswordHash));
     }
 
     [Fact]
@@ -332,10 +331,9 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput(email: "hashcheck@test.com", password: rawPassword));
 
-        result.IsSuccess.Should().BeTrue();
-        Account account = _fixture.DbContext.Accounts.Single(a => a.UserId == result.Value!.User.Id);
-        account.PasswordHash.Should().NotBe(rawPassword, "password must never be stored in plaintext");
-        account.PasswordHash.Should().Be($"hashed:{rawPassword}");
+        Assert.True(result.IsSuccess); Account account = _fixture.DbContext.Accounts.Single(a => a.UserId == result.Value!.User.Id);
+        Assert.NotEqual(rawPassword, account.PasswordHash);
+        Assert.Equal($"hashed:{rawPassword}", account.PasswordHash);
     }
 
     [Fact]
@@ -345,8 +343,8 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput(email: "guidcheck@test.com"));
 
-        result.IsSuccess.Should().BeTrue();
-        Guid.TryParse(result.Value!.User.Id, out _).Should().BeTrue("User ID should be a valid GUID");
+        Assert.True(result.IsSuccess);
+        Assert.True(Guid.TryParse(result.Value!.User.Id, out _), "User ID should be a valid GUID");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -359,14 +357,13 @@ public sealed class SignUpServiceTests : IDisposable
         _fixture.Options.EmailAndPassword.AutoSignIn = true;
         Session expectedSession = CreateMockSession();
         _sessionMock
-            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>()))
+            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<Session>.Success(expectedSession));
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput());
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value!.Session.Should().NotBeNull();
-        _sessionMock.Verify(s => s.CreateSessionAsync(It.Is<SessionCreateInput>(
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value!.Session); _sessionMock.Verify(s => s.CreateSessionAsync(It.Is<SessionCreateInput>(
             i => i.DontRememberMe == true)), Times.Once);
     }
 
@@ -377,9 +374,8 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput());
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value!.Session.Should().BeNull();
-        _sessionMock.Verify(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>()), Times.Never);
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value!.Session); _sessionMock.Verify(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -388,16 +384,16 @@ public sealed class SignUpServiceTests : IDisposable
         _fixture.Options.EmailAndPassword.AutoSignIn = true;
         SessionCreateInput? capturedInput = null;
         _sessionMock
-            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>()))
-            .Callback<SessionCreateInput>(i => capturedInput = i)
+            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()))
+            .Callback<SessionCreateInput, CancellationToken>((i, _) => capturedInput = i)
             .ReturnsAsync(Result<Session>.Success(CreateMockSession()));
 
         SignUpEmailInput input = ValidInput();
         await _sut.SignUpEmail(input);
 
-        capturedInput.Should().NotBeNull();
-        capturedInput!.IpAddress.Should().Be("127.0.0.1");
-        capturedInput.UserAgent.Should().Be("TestAgent/1.0");
+        Assert.NotNull(capturedInput);
+        Assert.Equal("127.0.0.1", capturedInput!.IpAddress);
+        Assert.Equal("TestAgent/1.0", capturedInput.UserAgent);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -421,8 +417,8 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(input);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value!.CallbackUrl.Should().Be("https://app.example.com/welcome");
+        Assert.True(result.IsSuccess);
+        Assert.Equal("https://app.example.com/welcome", result.Value!.CallbackUrl);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -437,7 +433,7 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput(password: unicodePassword));
 
-        result.IsSuccess.Should().BeTrue();
+        Assert.True(result.IsSuccess);
     }
 
     [Fact]
@@ -449,8 +445,8 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput(name: xssName));
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value!.User.Name.Should().Be(xssName);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(xssName, result.Value!.User.Name);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -466,9 +462,9 @@ public sealed class SignUpServiceTests : IDisposable
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput(email: "time@test.com"));
         DateTime after = DateTime.UtcNow.AddSeconds(1);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value!.User.CreatedAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
-        result.Value.User.UpdatedAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
+        Assert.True(result.IsSuccess);
+        Assert.InRange(result.Value!.User.CreatedAt, before, after);
+        Assert.InRange(result.Value.User.UpdatedAt, before, after);
     }
 
     [Fact]
@@ -478,10 +474,9 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput(email: "relations@test.com"));
 
-        result.IsSuccess.Should().BeTrue();
-        Account account = _fixture.DbContext.Accounts.Single(a => a.UserId == result.Value!.User.Id);
-        account.UserId.Should().Be(result.Value!.User.Id);
-        account.AccountId.Should().Be("relations@test.com");
+        Assert.True(result.IsSuccess); Account account = _fixture.DbContext.Accounts.Single(a => a.UserId == result.Value!.User.Id);
+        Assert.Equal(result.Value!.User.Id, account.UserId);
+        Assert.Equal("relations@test.com", account.AccountId);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -496,8 +491,7 @@ public sealed class SignUpServiceTests : IDisposable
 
         await _sut.SignUpEmail(ValidInput());
 
-        _fixture.DbContext.Users.Count().Should().Be(userCountBefore,
-            "no users should be created when feature is disabled");
+        Assert.Equal(userCountBefore, _fixture.DbContext.Users.Count());
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -519,7 +513,7 @@ public sealed class SignUpServiceTests : IDisposable
     private void SetupSessionMockForAutoSignIn()
     {
         _sessionMock
-            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>()))
+            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<Session>.Success(CreateMockSession()));
     }
 }

@@ -10,19 +10,20 @@ using Aegis.Auth.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Aegis.Auth.Features.Sessions
 {
     public interface ISessionService
     {
-        Task<Result<Session>> CreateSessionAsync(SessionCreateInput input);
-        Task<Result> RevokeSessionAsync(SessionDeleteInput input);
-        Task<Result> RevokeAllSessionsAsync(string userId);
+        Task<Result<Session>> CreateSessionAsync(SessionCreateInput input, CancellationToken cancellationToken = default);
+        Task<Result> RevokeSessionAsync(SessionDeleteInput input, CancellationToken cancellationToken = default);
+        Task<Result> RevokeAllSessionsAsync(string userId, CancellationToken cancellationToken = default);
     }
 
-    internal sealed class SessionService(AegisAuthOptions options, ILoggerFactory loggerFactory, IAuthDbContext dbContext, IDistributedCache? disCache) : ISessionService
+    internal sealed class SessionService(IOptions<AegisAuthOptions> optionsAccessor, ILoggerFactory loggerFactory, IAuthDbContext dbContext, IDistributedCache? disCache) : ISessionService
     {
-        private readonly AegisAuthOptions _options = options;
+        private readonly AegisAuthOptions _options = optionsAccessor.Value;
         private readonly IDistributedCache? _cache = disCache;
         private readonly IAuthDbContext _db = dbContext;
         private readonly ILogger _logger = loggerFactory.CreateLogger<SessionService>();
@@ -30,7 +31,7 @@ namespace Aegis.Auth.Features.Sessions
         private const int DefaultSessionExpiration = 604800; // 7 days in seconds (60 * 60 * 24 * 7)
         private const string RegistryKeyPrefix = "active-sessions-";
 
-        public async Task<Result<Session>> CreateSessionAsync(SessionCreateInput input)
+        public async Task<Result<Session>> CreateSessionAsync(SessionCreateInput input, CancellationToken cancellationToken = default)
         {
             _logger.SessionCreating(input.User.Id);
 
@@ -62,7 +63,7 @@ namespace Aegis.Auth.Features.Sessions
                 _db.Sessions.Add(data);
                 try
                 {
-                    await _db.SaveChangesAsync();
+                    await _db.SaveChangesAsync(cancellationToken);
                 }
                 catch (Exception ex)
                 {
@@ -87,7 +88,7 @@ namespace Aegis.Auth.Features.Sessions
                     for (var attempt = 0; attempt < maxRetries && !registryUpdated; attempt++)
                     {
                         // 1. Fetch the current session list for the user
-                        var currentListJson = await _cache.GetStringAsync(registryKey);
+                        var currentListJson = await _cache.GetStringAsync(registryKey, cancellationToken);
 
                         List<SessionReference> list = [];
                         if (string.IsNullOrWhiteSpace(currentListJson) is false)
@@ -110,10 +111,10 @@ namespace Aegis.Auth.Features.Sessions
 
                         if (furthestSessionTTL > 0)
                         {
-                            await _cache.SetStringAsync(registryKey, JsonSerializer.Serialize(list), new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(furthestSessionTTL) });
+                            await _cache.SetStringAsync(registryKey, JsonSerializer.Serialize(list), new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(furthestSessionTTL) }, cancellationToken);
 
                             // 4. Verify the registry update succeeded (optimistic check)
-                            var verifyJson = await _cache.GetStringAsync(registryKey);
+                            var verifyJson = await _cache.GetStringAsync(registryKey, cancellationToken);
                             if (!string.IsNullOrWhiteSpace(verifyJson))
                             {
                                 var verifyList = JsonSerializer.Deserialize<List<SessionReference>>(verifyJson);
@@ -144,7 +145,8 @@ namespace Aegis.Auth.Features.Sessions
                     await _cache.SetStringAsync(
                       data.Token,
                       sessionCacheData,
-                      new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(sessionTTL) }
+                                            new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(sessionTTL) },
+                                            cancellationToken
                     );
                 }
             }
@@ -153,7 +155,7 @@ namespace Aegis.Auth.Features.Sessions
             return data;
         }
 
-        public async Task<Result> RevokeSessionAsync(SessionDeleteInput input)
+        public async Task<Result> RevokeSessionAsync(SessionDeleteInput input, CancellationToken cancellationToken = default)
         {
             var token = input.Token;
             _logger.SessionRevoking(token);
@@ -161,11 +163,11 @@ namespace Aegis.Auth.Features.Sessions
             // 1. Remove session from cache (immediately de-authenticates for incoming requests)
             if (_cache is not null)
             {
-                await _cache.RemoveAsync(token);
+                await _cache.RemoveAsync(token, cancellationToken);
 
                 // 2. Update the active-sessions registry
                 var registryKey = RegistryKeyPrefix + input.User.Id;
-                var registryJson = await _cache.GetStringAsync(registryKey);
+                var registryJson = await _cache.GetStringAsync(registryKey, cancellationToken);
 
                 if (string.IsNullOrWhiteSpace(registryJson) is false)
                 {
@@ -179,7 +181,7 @@ namespace Aegis.Auth.Features.Sessions
                         if (list.Count == 0)
                         {
                             // No sessions left — delete the key entirely (Redis-friendly)
-                            await _cache.RemoveAsync(registryKey);
+                            await _cache.RemoveAsync(registryKey, cancellationToken);
                         }
                         else
                         {
@@ -191,11 +193,11 @@ namespace Aegis.Auth.Features.Sessions
                             if (ttlSeconds > 0)
                             {
                                 await _cache.SetStringAsync(registryKey, JsonSerializer.Serialize(list),
-                                  new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(ttlSeconds) });
+                                                                    new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(ttlSeconds) }, cancellationToken);
                             }
                             else
                             {
-                                await _cache.RemoveAsync(registryKey);
+                                await _cache.RemoveAsync(registryKey, cancellationToken);
                             }
                         }
                     }
@@ -205,13 +207,13 @@ namespace Aegis.Auth.Features.Sessions
             // 3. Remove from database (record-keeping; user is already functionally signed out)
             if (_options.Session.StoreSessionInDatabase || _cache is null)
             {
-                Session? dbSession = await _db.Sessions.FirstOrDefaultAsync(s => s.Token == token && s.UserId == input.User.Id);
+                Session? dbSession = await _db.Sessions.FirstOrDefaultAsync(s => s.Token == token && s.UserId == input.User.Id, cancellationToken);
                 if (dbSession is not null)
                 {
                     _db.Sessions.Remove(dbSession);
                     try
                     {
-                        await _db.SaveChangesAsync();
+                        await _db.SaveChangesAsync(cancellationToken);
                     }
                     catch (Exception ex)
                     {
@@ -225,7 +227,7 @@ namespace Aegis.Auth.Features.Sessions
             return Result.Success();
         }
 
-        public async Task<Result> RevokeAllSessionsAsync(string userId)
+        public async Task<Result> RevokeAllSessionsAsync(string userId, CancellationToken cancellationToken = default)
         {
             _logger.SessionRevokingAll(userId);
 
@@ -233,7 +235,7 @@ namespace Aegis.Auth.Features.Sessions
             if (_cache is not null)
             {
                 var registryKey = RegistryKeyPrefix + userId;
-                var registryJson = await _cache.GetStringAsync(registryKey);
+                var registryJson = await _cache.GetStringAsync(registryKey, cancellationToken);
 
                 if (string.IsNullOrWhiteSpace(registryJson) is false)
                 {
@@ -243,25 +245,25 @@ namespace Aegis.Auth.Features.Sessions
                         // Remove each cached session
                         foreach (SessionReference entry in list)
                         {
-                            await _cache.RemoveAsync(entry.Token);
+                            await _cache.RemoveAsync(entry.Token, cancellationToken);
                         }
                     }
 
                     // Delete the registry key itself
-                    await _cache.RemoveAsync(registryKey);
+                    await _cache.RemoveAsync(registryKey, cancellationToken);
                 }
             }
 
             // 2. Remove all from database
             if (_options.Session.StoreSessionInDatabase || _cache is null)
             {
-                List<Session> dbSessions = await _db.Sessions.Where(s => s.UserId == userId).ToListAsync();
+                List<Session> dbSessions = await _db.Sessions.Where(s => s.UserId == userId).ToListAsync(cancellationToken);
                 if (dbSessions.Count > 0)
                 {
                     _db.Sessions.RemoveRange(dbSessions);
                     try
                     {
-                        await _db.SaveChangesAsync();
+                        await _db.SaveChangesAsync(cancellationToken);
                     }
                     catch (Exception ex)
                     {

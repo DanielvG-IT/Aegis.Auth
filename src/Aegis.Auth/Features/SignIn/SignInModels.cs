@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
 using Aegis.Auth.Entities;
@@ -7,9 +8,16 @@ namespace Aegis.Auth.Features.SignIn
 {
     public class SignInEmailRequest
     {
+        [Required]
+        [EmailAddress]
         public required string Email { get; init; }
+
+        [Required]
+        [MinLength(1)]
         public required string Password { get; init; }
+
         public string? Callback { get; init; }
+
         public bool RememberMe { get; init; } = true;
     }
 
