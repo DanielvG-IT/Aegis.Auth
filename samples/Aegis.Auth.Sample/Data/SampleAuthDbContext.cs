@@ -1,6 +1,6 @@
+using Aegis.Auth.Abstractions;
 using Aegis.Auth.Entities;
 using Aegis.Auth.Extensions;
-using Aegis.Auth.Abstractions;
 using Aegis.Auth.Sample.Entities;
 
 using Microsoft.EntityFrameworkCore;
