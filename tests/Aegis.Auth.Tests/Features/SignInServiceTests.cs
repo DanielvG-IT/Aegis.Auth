@@ -2,10 +2,7 @@ using Aegis.Auth.Constants;
 using Aegis.Auth.Entities;
 using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Features.SignIn;
-using Aegis.Auth.Options;
 using Aegis.Auth.Tests.Helpers;
-
-using FluentAssertions;
 
 using Moq;
 
@@ -27,7 +24,7 @@ public sealed class SignInServiceTests : IDisposable
         _fixture = new ServiceTestFixture();
         _sessionMock = new Mock<ISessionService>(MockBehavior.Strict);
         _sut = new SignInService(
-            _fixture.Options,
+            Microsoft.Extensions.Options.Options.Create(_fixture.Options),
             _fixture.LoggerFactory,
             _fixture.DbContext,
             _sessionMock.Object);
@@ -58,8 +55,8 @@ public sealed class SignInServiceTests : IDisposable
 
         Result<SignInResult> result = await _sut.SignInEmail(ValidInput());
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(AuthErrors.System.FeatureDisabled);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.System.FeatureDisabled, result.ErrorCode);
     }
 
     [Fact]
@@ -70,7 +67,7 @@ public sealed class SignInServiceTests : IDisposable
 
         // Seed a user to show the outcome is independent of existing DB state
         Result<SignInResult> result = await _sut.SignInEmail(ValidInput());
-        result.ErrorCode.Should().Be(AuthErrors.System.FeatureDisabled);
+        Assert.Equal(AuthErrors.System.FeatureDisabled, result.ErrorCode);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -87,8 +84,8 @@ public sealed class SignInServiceTests : IDisposable
     {
         Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: email!));
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(AuthErrors.Validation.InvalidInput);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.Validation.InvalidInput, result.ErrorCode);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -105,8 +102,8 @@ public sealed class SignInServiceTests : IDisposable
     {
         Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: email));
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(AuthErrors.Validation.InvalidInput);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.Validation.InvalidInput, result.ErrorCode);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -120,8 +117,8 @@ public sealed class SignInServiceTests : IDisposable
     {
         Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: "ghost@test.com"));
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(AuthErrors.Identity.InvalidEmailOrPassword);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.Identity.InvalidEmailOrPassword, result.ErrorCode);
     }
 
     [Fact]
@@ -138,7 +135,7 @@ public sealed class SignInServiceTests : IDisposable
 
         await _sut.SignInEmail(ValidInput(email: "ghost@test.com"));
 
-        hashCalled.Should().BeTrue("Hash must be called for non-existent users to prevent timing attacks");
+        Assert.True(hashCalled, "Hash must be called for non-existent users to prevent timing attacks");
     }
 
     [Fact]
@@ -148,8 +145,8 @@ public sealed class SignInServiceTests : IDisposable
 
         Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: "user@test.com", password: "WrongPassword"));
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(AuthErrors.Identity.InvalidEmailOrPassword);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.Identity.InvalidEmailOrPassword, result.ErrorCode);
     }
 
     [Fact]
@@ -161,8 +158,7 @@ public sealed class SignInServiceTests : IDisposable
         Result<SignInResult> wrongPassword = await _sut.SignInEmail(ValidInput(email: "real@test.com", password: "WrongOne"));
 
         // Both must return identical error codes — no information leakage
-        nonExistent.ErrorCode.Should().Be(wrongPassword.ErrorCode,
-            "error codes must be identical to prevent user enumeration");
+        Assert.Equal(wrongPassword.ErrorCode, nonExistent.ErrorCode);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -177,8 +173,8 @@ public sealed class SignInServiceTests : IDisposable
 
         Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: "oauth@test.com", password: "anything"));
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(AuthErrors.Identity.InvalidEmailOrPassword);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.Identity.InvalidEmailOrPassword, result.ErrorCode);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -192,8 +188,8 @@ public sealed class SignInServiceTests : IDisposable
 
         Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: "nohash@test.com", password: "anything"));
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(AuthErrors.Identity.InvalidEmailOrPassword);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.Identity.InvalidEmailOrPassword, result.ErrorCode);
     }
 
     [Fact]
@@ -209,7 +205,7 @@ public sealed class SignInServiceTests : IDisposable
 
         await _sut.SignInEmail(ValidInput(email: "nohash2@test.com", password: "anything"));
 
-        hashCalled.Should().BeTrue("Hash must be called even with null password hash to prevent timing attacks");
+        Assert.True(hashCalled, "Hash must be called even with null password hash to prevent timing attacks");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -224,7 +220,7 @@ public sealed class SignInServiceTests : IDisposable
 
         Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: "CaseTest@TEST.COM", password: "Password123!"));
 
-        result.IsSuccess.Should().BeTrue();
+        Assert.True(result.IsSuccess);
     }
 
     [Fact]
@@ -235,7 +231,7 @@ public sealed class SignInServiceTests : IDisposable
 
         Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: "  trim@test.com  ", password: "Password123!"));
 
-        result.IsSuccess.Should().BeTrue();
+        Assert.True(result.IsSuccess);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -250,9 +246,9 @@ public sealed class SignInServiceTests : IDisposable
 
         Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: "valid@test.com", password: "CorrectPass!"));
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value!.User.Email.Should().Be("valid@test.com");
-        result.Value.Session.Should().NotBeNull();
+        Assert.True(result.IsSuccess);
+        Assert.Equal("valid@test.com", result.Value!.User.Email);
+        Assert.NotNull(result.Value.Session);
     }
 
     [Fact]
@@ -273,8 +269,8 @@ public sealed class SignInServiceTests : IDisposable
 
         Result<SignInResult> result = await _sut.SignInEmail(input);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value!.CallbackUrl.Should().Be("https://app.example.com/dashboard");
+        Assert.True(result.IsSuccess);
+        Assert.Equal("https://app.example.com/dashboard", result.Value!.CallbackUrl);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -287,14 +283,14 @@ public sealed class SignInServiceTests : IDisposable
         await _fixture.SeedUserAsync(email: "remember@test.com", password: "Password!");
         SessionCreateInput? captured = null;
         _sessionMock
-            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>()))
-            .Callback<SessionCreateInput>(i => captured = i)
+            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()))
+            .Callback<SessionCreateInput, CancellationToken>((i, _) => captured = i)
             .ReturnsAsync(Result<Session>.Success(CreateMockSession()));
 
         await _sut.SignInEmail(ValidInput(email: "remember@test.com", password: "Password!", rememberMe: true));
 
-        captured.Should().NotBeNull();
-        captured!.DontRememberMe.Should().BeFalse("RememberMe=true should set DontRememberMe=false");
+        Assert.NotNull(captured);
+        Assert.False(captured!.DontRememberMe, "RememberMe=true should set DontRememberMe=false");
     }
 
     [Fact]
@@ -303,14 +299,14 @@ public sealed class SignInServiceTests : IDisposable
         await _fixture.SeedUserAsync(email: "forget@test.com", password: "Password!");
         SessionCreateInput? captured = null;
         _sessionMock
-            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>()))
-            .Callback<SessionCreateInput>(i => captured = i)
+            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()))
+            .Callback<SessionCreateInput, CancellationToken>((i, _) => captured = i)
             .ReturnsAsync(Result<Session>.Success(CreateMockSession()));
 
         await _sut.SignInEmail(ValidInput(email: "forget@test.com", password: "Password!", rememberMe: false));
 
-        captured.Should().NotBeNull();
-        captured!.DontRememberMe.Should().BeTrue("RememberMe=false should set DontRememberMe=true");
+        Assert.NotNull(captured);
+        Assert.True(captured!.DontRememberMe, "RememberMe=false should set DontRememberMe=true");
     }
 
     [Fact]
@@ -318,13 +314,13 @@ public sealed class SignInServiceTests : IDisposable
     {
         await _fixture.SeedUserAsync(email: "sessionfail@test.com", password: "Password!");
         _sessionMock
-            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>()))
+            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<Session>.Failure(AuthErrors.System.InternalError, "Boom"));
 
         Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: "sessionfail@test.com", password: "Password!"));
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(AuthErrors.System.FailedToCreateSession);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.System.FailedToCreateSession, result.ErrorCode);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -337,8 +333,8 @@ public sealed class SignInServiceTests : IDisposable
         await _fixture.SeedUserAsync(email: "meta@test.com", password: "Password!");
         SessionCreateInput? captured = null;
         _sessionMock
-            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>()))
-            .Callback<SessionCreateInput>(i => captured = i)
+            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()))
+            .Callback<SessionCreateInput, CancellationToken>((i, _) => captured = i)
             .ReturnsAsync(Result<Session>.Success(CreateMockSession()));
 
         var input = new SignInEmailInput
@@ -352,9 +348,9 @@ public sealed class SignInServiceTests : IDisposable
 
         await _sut.SignInEmail(input);
 
-        captured.Should().NotBeNull();
-        captured!.IpAddress.Should().Be("192.168.1.100");
-        captured.UserAgent.Should().Be("Mozilla/5.0 (Attacker)");
+        Assert.NotNull(captured);
+        Assert.Equal("192.168.1.100", captured!.IpAddress);
+        Assert.Equal("Mozilla/5.0 (Attacker)", captured.UserAgent);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -371,7 +367,7 @@ public sealed class SignInServiceTests : IDisposable
 
         Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: "alwaystrue@test.com", password: "literally-anything"));
 
-        result.IsSuccess.Should().BeTrue("the verifier accepted the password");
+        Assert.True(result.IsSuccess, "the verifier accepted the password");
     }
 
     [Fact]
@@ -382,8 +378,8 @@ public sealed class SignInServiceTests : IDisposable
 
         Result<SignInResult> result = await _sut.SignInEmail(ValidInput(email: "alwaysfalse@test.com", password: "CorrectPassword!"));
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(AuthErrors.Identity.InvalidEmailOrPassword);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.Identity.InvalidEmailOrPassword, result.ErrorCode);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -405,7 +401,7 @@ public sealed class SignInServiceTests : IDisposable
     private void SetupSessionMock()
     {
         _sessionMock
-            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>()))
+            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<Session>.Success(CreateMockSession()));
     }
 }

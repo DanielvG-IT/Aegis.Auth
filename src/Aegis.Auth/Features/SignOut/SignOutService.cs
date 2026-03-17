@@ -3,7 +3,6 @@ using Aegis.Auth.Constants;
 using Aegis.Auth.Entities;
 using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Logging;
-using Aegis.Auth.Options;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -12,24 +11,23 @@ namespace Aegis.Auth.Features.SignOut
 {
     public interface ISignOutService
     {
-        Task<Result> SignOut(SignOutInput input);
+        Task<Result> SignOut(SignOutInput input, CancellationToken cancellationToken = default);
     }
 
-    internal sealed class SignOutService(AegisAuthOptions options, ILoggerFactory loggerFactory, IAuthDbContext dbContext, ISessionService sessionService) : ISignOutService
+    internal sealed class SignOutService(ILoggerFactory loggerFactory, IAuthDbContext dbContext, ISessionService sessionService) : ISignOutService
     {
         private readonly IAuthDbContext _db = dbContext;
-        private readonly AegisAuthOptions _options = options;
         private readonly ISessionService _sessionService = sessionService;
         private readonly ILogger _logger = loggerFactory.CreateLogger<SignOutService>();
 
-        public async Task<Result> SignOut(SignOutInput input)
+        public async Task<Result> SignOut(SignOutInput input, CancellationToken cancellationToken = default)
         {
             _logger.SignOutAttemptInitiated();
 
             // Look up the session to get the userId for registry cleanup
             Session? session = await _db.Sessions
                 .Include(s => s.User)
-                .FirstOrDefaultAsync(s => s.Token == input.Token);
+                .FirstOrDefaultAsync(s => s.Token == input.Token, cancellationToken);
 
             if (session is null)
             {
@@ -44,7 +42,7 @@ namespace Aegis.Auth.Features.SignOut
                 Token = input.Token
             };
 
-            Result result = await _sessionService.RevokeSessionAsync(revokeInput);
+            Result result = await _sessionService.RevokeSessionAsync(revokeInput, cancellationToken);
             if (result.IsSuccess is false)
             {
                 _logger.SignOutRevocationFailed(input.Token);

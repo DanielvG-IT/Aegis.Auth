@@ -1,15 +1,10 @@
 using System.Text.Json;
 
-using Aegis.Auth.Constants;
 using Aegis.Auth.Entities;
 using Aegis.Auth.Features.Sessions;
-using Aegis.Auth.Options;
 using Aegis.Auth.Tests.Helpers;
 
-using FluentAssertions;
-
 using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Logging;
 
 using Moq;
 
@@ -33,7 +28,7 @@ public sealed class SessionServiceTests : IDisposable
         _fixture = new ServiceTestFixture();
         SetupCacheMock();
         _sut = new SessionService(
-            _fixture.Options,
+            Microsoft.Extensions.Options.Options.Create(_fixture.Options),
             _fixture.LoggerFactory,
             _fixture.DbContext,
             _fixture.CacheMock.Object);
@@ -85,10 +80,10 @@ public sealed class SessionServiceTests : IDisposable
 
         Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user));
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().NotBeNull();
-        result.Value!.Token.Should().NotBeNullOrWhiteSpace();
-        result.Value.UserId.Should().Be(user.Id);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.False(string.IsNullOrWhiteSpace(result.Value!.Token));
+        Assert.Equal(user.Id, result.Value.UserId);
     }
 
     [Fact]
@@ -98,8 +93,8 @@ public sealed class SessionServiceTests : IDisposable
 
         Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user));
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value!.Token.Should().HaveLength(32);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(32, result.Value!.Token.Length);
     }
 
     [Fact]
@@ -109,8 +104,8 @@ public sealed class SessionServiceTests : IDisposable
 
         Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user));
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value!.Token.Should().MatchRegex("^[a-zA-Z0-9]+$");
+        Assert.True(result.IsSuccess);
+        Assert.Matches("^[a-zA-Z0-9]+$", result.Value!.Token);
     }
 
     [Fact]
@@ -121,8 +116,7 @@ public sealed class SessionServiceTests : IDisposable
         Result<Session> result1 = await _sut.CreateSessionAsync(CreateInput(user));
         Result<Session> result2 = await _sut.CreateSessionAsync(CreateInput(user));
 
-        result1.Value!.Token.Should().NotBe(result2.Value!.Token,
-            "each session must get a unique token");
+        Assert.NotEqual(result2.Value!.Token, result1.Value!.Token);
     }
 
     [Fact]
@@ -133,7 +127,7 @@ public sealed class SessionServiceTests : IDisposable
         Result<Session> result1 = await _sut.CreateSessionAsync(CreateInput(user));
         Result<Session> result2 = await _sut.CreateSessionAsync(CreateInput(user));
 
-        result1.Value!.Id.Should().NotBe(result2.Value!.Id);
+        Assert.NotEqual(result2.Value!.Id, result1.Value!.Id);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -148,9 +142,9 @@ public sealed class SessionServiceTests : IDisposable
 
         Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user, dontRemember: true));
 
-        result.IsSuccess.Should().BeTrue();
+        Assert.True(result.IsSuccess);
         DateTime expectedExpiry = before.AddDays(1);
-        result.Value!.ExpiresAt.Should().BeCloseTo(expectedExpiry, TimeSpan.FromSeconds(5));
+        Assert.InRange(result.Value!.ExpiresAt, expectedExpiry - TimeSpan.FromSeconds(5), expectedExpiry + TimeSpan.FromSeconds(5));
     }
 
     [Fact]
@@ -162,9 +156,9 @@ public sealed class SessionServiceTests : IDisposable
 
         Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user, dontRemember: false));
 
-        result.IsSuccess.Should().BeTrue();
+        Assert.True(result.IsSuccess);
         DateTime expectedExpiry = before.AddSeconds(3600);
-        result.Value!.ExpiresAt.Should().BeCloseTo(expectedExpiry, TimeSpan.FromSeconds(5));
+        Assert.InRange(result.Value!.ExpiresAt, expectedExpiry - TimeSpan.FromSeconds(5), expectedExpiry + TimeSpan.FromSeconds(5));
     }
 
     [Fact]
@@ -176,9 +170,9 @@ public sealed class SessionServiceTests : IDisposable
 
         Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user, dontRemember: false));
 
-        result.IsSuccess.Should().BeTrue();
+        Assert.True(result.IsSuccess);
         DateTime expectedExpiry = before.AddSeconds(604800); // 7 days default
-        result.Value!.ExpiresAt.Should().BeCloseTo(expectedExpiry, TimeSpan.FromSeconds(5));
+        Assert.InRange(result.Value!.ExpiresAt, expectedExpiry - TimeSpan.FromSeconds(5), expectedExpiry + TimeSpan.FromSeconds(5));
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -193,10 +187,10 @@ public sealed class SessionServiceTests : IDisposable
 
         Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user));
 
-        result.IsSuccess.Should().BeTrue();
+        Assert.True(result.IsSuccess);
         Session? dbSession = _fixture.DbContext.Sessions.SingleOrDefault(s => s.Id == result.Value!.Id);
-        dbSession.Should().NotBeNull();
-        dbSession!.Token.Should().Be(result.Value!.Token);
+        Assert.NotNull(dbSession);
+        Assert.Equal(result.Value!.Token, dbSession!.Token);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -210,9 +204,9 @@ public sealed class SessionServiceTests : IDisposable
 
         Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user));
 
-        result.IsSuccess.Should().BeTrue();
+        Assert.True(result.IsSuccess);
         // The cache should have the session token as a key
-        _cacheStore.Should().ContainKey(result.Value!.Token);
+        Assert.True(_cacheStore.ContainsKey(result.Value!.Token));
     }
 
     [Fact]
@@ -223,7 +217,7 @@ public sealed class SessionServiceTests : IDisposable
         await _sut.CreateSessionAsync(CreateInput(user));
 
         var registryKey = $"active-sessions-{user.Id}";
-        _cacheStore.Should().ContainKey(registryKey);
+        Assert.True(_cacheStore.ContainsKey(registryKey));
     }
 
     [Fact]
@@ -234,9 +228,9 @@ public sealed class SessionServiceTests : IDisposable
         Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user));
 
         var registryKey = $"active-sessions-{user.Id}";
-        _cacheStore.Should().ContainKey(registryKey);
+        Assert.True(_cacheStore.ContainsKey(registryKey));
         var registryJson = _cacheStore[registryKey].Value;
-        registryJson.Should().Contain(result.Value!.Token);
+        Assert.Contains(result.Value!.Token, registryJson);
     }
 
     [Fact]
@@ -250,9 +244,9 @@ public sealed class SessionServiceTests : IDisposable
         var registryKey = $"active-sessions-{user.Id}";
         var registryJson = _cacheStore[registryKey].Value;
         List<JsonElement> registry = JsonSerializer.Deserialize<List<JsonElement>>(registryJson)!;
-        registry.Count.Should().BeGreaterThanOrEqualTo(2);
-        registryJson.Should().Contain(r1.Value!.Token);
-        registryJson.Should().Contain(r2.Value!.Token);
+        Assert.True(registry.Count >= 2);
+        Assert.Contains(r1.Value!.Token, registryJson);
+        Assert.Contains(r2.Value!.Token, registryJson);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -263,7 +257,7 @@ public sealed class SessionServiceTests : IDisposable
     public async Task CreateSession_NullCache_StillPersistsToDatabase()
     {
         var noCacheSut = new SessionService(
-            _fixture.Options,
+            Microsoft.Extensions.Options.Options.Create(_fixture.Options),
             _fixture.LoggerFactory,
             _fixture.DbContext,
             disCache: null);
@@ -271,8 +265,8 @@ public sealed class SessionServiceTests : IDisposable
         User user = CreateTestUser();
         Result<Session> result = await noCacheSut.CreateSessionAsync(CreateInput(user));
 
-        result.IsSuccess.Should().BeTrue();
-        _fixture.DbContext.Sessions.Should().Contain(s => s.Id == result.Value!.Id);
+        Assert.True(result.IsSuccess);
+        Assert.Contains(_fixture.DbContext.Sessions, s => s.Id == result.Value!.Id);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -291,7 +285,7 @@ public sealed class SessionServiceTests : IDisposable
             Token = session.Token,
         });
 
-        result.IsSuccess.Should().BeTrue();
+        Assert.True(result.IsSuccess);
     }
 
     [Fact]
@@ -299,15 +293,14 @@ public sealed class SessionServiceTests : IDisposable
     {
         User user = CreateTestUser();
         Session session = await CreateAndPersistSessionAsync(user);
-        _cacheStore.Should().ContainKey(session.Token);
-
+        Assert.True(_cacheStore.ContainsKey(session.Token));
         await _sut.RevokeSessionAsync(new SessionDeleteInput
         {
             User = user,
             Token = session.Token,
         });
 
-        _cacheStore.Should().NotContainKey(session.Token);
+        Assert.False(_cacheStore.ContainsKey(session.Token));
     }
 
     [Fact]
@@ -322,7 +315,7 @@ public sealed class SessionServiceTests : IDisposable
             Token = session.Token,
         });
 
-        _fixture.DbContext.Sessions.Should().NotContain(s => s.Token == session.Token);
+        Assert.DoesNotContain(_fixture.DbContext.Sessions, s => s.Token == session.Token);
     }
 
     [Fact]
@@ -331,8 +324,7 @@ public sealed class SessionServiceTests : IDisposable
         User user = CreateTestUser();
         Session session = await CreateAndPersistSessionAsync(user);
         var registryKey = $"active-sessions-{user.Id}";
-        _cacheStore.Should().ContainKey(registryKey);
-
+        Assert.True(_cacheStore.ContainsKey(registryKey));
         await _sut.RevokeSessionAsync(new SessionDeleteInput
         {
             User = user,
@@ -340,10 +332,10 @@ public sealed class SessionServiceTests : IDisposable
         });
 
         // Registry should be removed entirely when it's the only session
-        if (_cacheStore.ContainsKey(registryKey))
+        if (_cacheStore.TryGetValue(registryKey, out (string Value, DateTimeOffset? Expiry) value))
         {
-            var registryJson = _cacheStore[registryKey].Value;
-            registryJson.Should().NotContain(session.Token);
+            var registryJson = value.Value;
+            Assert.DoesNotContain(session.Token, registryJson);
         }
     }
 
@@ -360,17 +352,14 @@ public sealed class SessionServiceTests : IDisposable
 
         Result result = await _sut.RevokeAllSessionsAsync(user.Id);
 
-        result.IsSuccess.Should().BeTrue();
-
+        Assert.True(result.IsSuccess);
         // Cache should not contain either session token
-        _cacheStore.Should().NotContainKey(s1.Token);
-        _cacheStore.Should().NotContainKey(s2.Token);
-
+        Assert.False(_cacheStore.ContainsKey(s1.Token));
+        Assert.False(_cacheStore.ContainsKey(s2.Token));
         // Registry should be gone
-        _cacheStore.Should().NotContainKey($"active-sessions-{user.Id}");
-
+        Assert.False(_cacheStore.ContainsKey($"active-sessions-{user.Id}"));
         // DB should be clean
-        _fixture.DbContext.Sessions.Where(s => s.UserId == user.Id).Should().BeEmpty();
+        Assert.Empty(_fixture.DbContext.Sessions.Where(s => s.UserId == user.Id));
     }
 
     [Fact]
@@ -380,7 +369,7 @@ public sealed class SessionServiceTests : IDisposable
 
         Result result = await _sut.RevokeAllSessionsAsync(user.Id);
 
-        result.IsSuccess.Should().BeTrue();
+        Assert.True(result.IsSuccess);
     }
 
     [Fact]
@@ -395,11 +384,10 @@ public sealed class SessionServiceTests : IDisposable
         await _sut.RevokeAllSessionsAsync(user1.Id);
 
         // User2's session should still exist
-        _cacheStore.Should().ContainKey(s2.Token);
-        _fixture.DbContext.Sessions.Should().Contain(s => s.UserId == user2.Id);
-
+        Assert.True(_cacheStore.ContainsKey(s2.Token));
+        Assert.Contains(_fixture.DbContext.Sessions, s => s.UserId == user2.Id);
         // User1's should be gone
-        _cacheStore.Should().NotContainKey(s1.Token);
+        Assert.False(_cacheStore.ContainsKey(s1.Token));
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -415,8 +403,8 @@ public sealed class SessionServiceTests : IDisposable
         Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user));
         DateTime after = DateTime.UtcNow.AddSeconds(1);
 
-        result.Value!.CreatedAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
-        result.Value.UpdatedAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
+        Assert.InRange(result.Value!.CreatedAt, before, after);
+        Assert.InRange(result.Value.UpdatedAt, before, after);
     }
 
     [Fact]
@@ -433,8 +421,8 @@ public sealed class SessionServiceTests : IDisposable
 
         Result<Session> result = await _sut.CreateSessionAsync(input);
 
-        result.Value!.IpAddress.Should().Be("203.0.113.42");
-        result.Value.UserAgent.Should().Be("CustomBot/2.0");
+        Assert.Equal("203.0.113.42", result.Value!.IpAddress);
+        Assert.Equal("CustomBot/2.0", result.Value.UserAgent);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -449,8 +437,9 @@ public sealed class SessionServiceTests : IDisposable
 
         Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user, dontRemember: false));
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value!.ExpiresAt.Should().BeCloseTo(DateTime.UtcNow.AddSeconds(1), TimeSpan.FromSeconds(3));
+        Assert.True(result.IsSuccess);
+        DateTime expectedExpiry = DateTime.UtcNow.AddSeconds(1);
+        Assert.InRange(result.Value!.ExpiresAt, expectedExpiry - TimeSpan.FromSeconds(3), expectedExpiry + TimeSpan.FromSeconds(3));
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -513,7 +502,7 @@ public sealed class SessionServiceTests : IDisposable
         // Pass a cloned (untracked) user to avoid EF navigation cycles
         // that cause JsonSerializer circular reference errors
         Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user));
-        result.IsSuccess.Should().BeTrue();
+        Assert.True(result.IsSuccess);
         return result.Value!;
     }
 }

@@ -3,7 +3,6 @@ using System.Text;
 
 using Aegis.Auth.Core.Crypto;
 
-using FluentAssertions;
 
 namespace Aegis.Auth.Tests.Crypto;
 
@@ -29,7 +28,7 @@ public sealed class AegisCryptoTests
         var encrypted = AegisCrypto.Encrypt(plaintext, TestSecret);
         var decrypted = AegisCrypto.Decrypt(encrypted, TestSecret);
 
-        decrypted.Should().Be(plaintext);
+        Assert.Equal(plaintext, decrypted);
     }
 
     [Fact]
@@ -38,7 +37,7 @@ public sealed class AegisCryptoTests
         var encrypted = AegisCrypto.Encrypt("", TestSecret);
         var decrypted = AegisCrypto.Decrypt(encrypted, TestSecret);
 
-        decrypted.Should().Be("");
+        Assert.Equal("", decrypted);
     }
 
     [Fact]
@@ -49,7 +48,7 @@ public sealed class AegisCryptoTests
         var encrypted = AegisCrypto.Encrypt(unicode, TestSecret);
         var decrypted = AegisCrypto.Decrypt(encrypted, TestSecret);
 
-        decrypted.Should().Be(unicode);
+        Assert.Equal(unicode, decrypted);
     }
 
     [Fact]
@@ -61,7 +60,7 @@ public sealed class AegisCryptoTests
         var encrypted = AegisCrypto.Encrypt(large, TestSecret);
         var decrypted = AegisCrypto.Decrypt(encrypted, TestSecret);
 
-        decrypted.Should().Be(large);
+        Assert.Equal(large, decrypted);
     }
 
     [Fact]
@@ -72,7 +71,7 @@ public sealed class AegisCryptoTests
         var encrypted = AegisCrypto.Encrypt(json, TestSecret);
         var decrypted = AegisCrypto.Decrypt(encrypted, TestSecret);
 
-        decrypted.Should().Be(json);
+        Assert.Equal(json, decrypted);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -87,7 +86,7 @@ public sealed class AegisCryptoTests
         var encrypted1 = AegisCrypto.Encrypt(plaintext, TestSecret);
         var encrypted2 = AegisCrypto.Encrypt(plaintext, TestSecret);
 
-        encrypted1.Should().NotBe(encrypted2, "each encryption must use a fresh nonce");
+        Assert.NotEqual(encrypted2, encrypted1);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -101,7 +100,7 @@ public sealed class AegisCryptoTests
 
         var decrypted = AegisCrypto.Decrypt(encrypted, AltSecret);
 
-        decrypted.Should().BeNull("decryption with wrong key must fail");
+        Assert.Null(decrypted);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -121,7 +120,7 @@ public sealed class AegisCryptoTests
 
         var decrypted = AegisCrypto.Decrypt(tampered, TestSecret);
 
-        decrypted.Should().BeNull("AES-GCM must detect tampering");
+        Assert.Null(decrypted);
     }
 
     [Fact]
@@ -134,7 +133,7 @@ public sealed class AegisCryptoTests
 
         var decrypted = AegisCrypto.Decrypt(truncated, TestSecret);
 
-        decrypted.Should().BeNull("truncated ciphertext must be rejected");
+        Assert.Null(decrypted);
     }
 
     [Fact]
@@ -146,7 +145,7 @@ public sealed class AegisCryptoTests
 
         var decrypted = AegisCrypto.Decrypt(extended, TestSecret);
 
-        decrypted.Should().BeNull("appended data corrupts the authentication tag check");
+        Assert.Null(decrypted);
     }
 
     [Fact]
@@ -158,7 +157,7 @@ public sealed class AegisCryptoTests
 
         var decrypted = AegisCrypto.Decrypt(randomBase64, TestSecret);
 
-        decrypted.Should().BeNull();
+        Assert.Null(decrypted);
     }
 
     [Fact]
@@ -166,7 +165,7 @@ public sealed class AegisCryptoTests
     {
         var decrypted = AegisCrypto.Decrypt("", TestSecret);
 
-        decrypted.Should().BeNull("empty ciphertext has no nonce/tag");
+        Assert.Null(decrypted);
     }
 
     [Fact]
@@ -178,7 +177,7 @@ public sealed class AegisCryptoTests
 
         var decrypted = AegisCrypto.Decrypt(tooShort, TestSecret);
 
-        decrypted.Should().BeNull();
+        Assert.Null(decrypted);
     }
 
     [Fact]
@@ -189,7 +188,7 @@ public sealed class AegisCryptoTests
         var encrypted = AegisCrypto.Encrypt("", TestSecret);
         var decrypted = AegisCrypto.Decrypt(encrypted, TestSecret);
 
-        decrypted.Should().Be("");
+        Assert.Equal("", decrypted);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -205,7 +204,7 @@ public sealed class AegisCryptoTests
         var encoded = AegisCrypto.ToBase64Url(data);
         var decoded = AegisCrypto.FromBase64Url(encoded);
 
-        decoded.Should().BeEquivalentTo(data);
+        Assert.Equal(data, decoded);
     }
 
     [Fact]
@@ -217,9 +216,9 @@ public sealed class AegisCryptoTests
 
         var encoded = AegisCrypto.ToBase64Url(data);
 
-        encoded.Should().NotContain("+");
-        encoded.Should().NotContain("/");
-        encoded.Should().NotContain("=");
+        Assert.DoesNotContain("+", encoded);
+        Assert.DoesNotContain("/", encoded);
+        Assert.DoesNotContain("=", encoded);
     }
 
     [Fact]
@@ -227,7 +226,7 @@ public sealed class AegisCryptoTests
     {
         var encoded = AegisCrypto.ToBase64Url(Array.Empty<byte>());
 
-        encoded.Should().BeEmpty();
+        Assert.Empty(encoded);
     }
 
     [Fact]
@@ -237,7 +236,7 @@ public sealed class AegisCryptoTests
         var encoded = AegisCrypto.ToBase64Url(original);
         var decoded = AegisCrypto.FromBase64UrlToString(encoded);
 
-        decoded.Should().Be(original);
+        Assert.Equal(original, decoded);
     }
 
     [Fact]
@@ -245,7 +244,7 @@ public sealed class AegisCryptoTests
     {
         var decoded = AegisCrypto.FromBase64UrlToString("!!!not-base64!!!");
 
-        decoded.Should().BeNull();
+        Assert.Null(decoded);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -257,7 +256,7 @@ public sealed class AegisCryptoTests
     {
         var result = AegisCrypto.RandomStringGenerator(32, "a-z", "A-Z", "0-9");
 
-        result.Should().HaveLength(32);
+        Assert.Equal(32, result.Length);
     }
 
     [Fact]
@@ -265,8 +264,8 @@ public sealed class AegisCryptoTests
     {
         var result = AegisCrypto.RandomStringGenerator(1, "a-z");
 
-        result.Should().HaveLength(1);
-        result[0].Should().BeInRange('a', 'z');
+        Assert.Equal(1, result.Length);
+        Assert.InRange(result[0], 'a', 'z');
     }
 
     [Fact]
@@ -274,7 +273,7 @@ public sealed class AegisCryptoTests
     {
         var result = AegisCrypto.RandomStringGenerator(100, "a-z");
 
-        result.Should().MatchRegex("^[a-z]+$");
+        Assert.Matches("^[a-z]+$", result);
     }
 
     [Fact]
@@ -282,7 +281,7 @@ public sealed class AegisCryptoTests
     {
         var result = AegisCrypto.RandomStringGenerator(100, "0-9");
 
-        result.Should().MatchRegex("^[0-9]+$");
+        Assert.Matches("^[0-9]+$", result);
     }
 
     [Fact]
@@ -292,7 +291,7 @@ public sealed class AegisCryptoTests
         var r2 = AegisCrypto.RandomStringGenerator(32, "a-z", "A-Z", "0-9");
 
         // Theoretically could be equal, but probability is ~2^-190
-        r1.Should().NotBe(r2);
+        Assert.NotEqual(r2, r1);
     }
 
     [Fact]
@@ -300,7 +299,7 @@ public sealed class AegisCryptoTests
     {
         Func<string> act = () => AegisCrypto.RandomStringGenerator(0, "a-z");
 
-        act.Should().Throw<ArgumentOutOfRangeException>();
+        Assert.Throws<ArgumentOutOfRangeException>(act);
     }
 
     [Fact]
@@ -308,7 +307,7 @@ public sealed class AegisCryptoTests
     {
         Func<string> act = () => AegisCrypto.RandomStringGenerator(-1, "a-z");
 
-        act.Should().Throw<ArgumentOutOfRangeException>();
+        Assert.Throws<ArgumentOutOfRangeException>(act);
     }
 
     [Fact]
@@ -316,7 +315,7 @@ public sealed class AegisCryptoTests
     {
         Func<string> act = () => AegisCrypto.RandomStringGenerator(10, "nonexistent-alphabet");
 
-        act.Should().Throw<ArgumentException>();
+        Assert.Throws<ArgumentException>(act);
     }
 
     [Fact]
@@ -326,9 +325,9 @@ public sealed class AegisCryptoTests
         var result = AegisCrypto.RandomStringGenerator(1000);
 
         // Should contain at least some of each type over 1000 chars
-        result.Should().MatchRegex("[a-z]");
-        result.Should().MatchRegex("[A-Z]");
-        result.Should().MatchRegex("[0-9]");
+        Assert.Matches("[a-z]", result);
+        Assert.Matches("[A-Z]", result);
+        Assert.Matches("[0-9]", result);
     }
 
     [Fact]
@@ -336,7 +335,7 @@ public sealed class AegisCryptoTests
     {
         var result = AegisCrypto.RandomStringGenerator(100_000, "a-z", "A-Z", "0-9");
 
-        result.Should().HaveLength(100_000);
+        Assert.Equal(100_000, result.Length);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -352,6 +351,6 @@ public sealed class AegisCryptoTests
         // Decrypt using the same secret string (simulating another instance)
         var decrypted = AegisCrypto.Decrypt(encrypted, TestSecret);
 
-        decrypted.Should().Be("cross-instance");
+        Assert.Equal("cross-instance", decrypted);
     }
 }

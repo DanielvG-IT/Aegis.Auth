@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
 using Aegis.Auth.Entities;
@@ -7,10 +8,21 @@ namespace Aegis.Auth.Features.SignUp
 {
     public class SignUpEmailRequest
     {
+        [Required]
+        [StringLength(100, MinimumLength = 1)]
         public required string Name { get; init; }
+
+        [Required]
+        [EmailAddress]
         public required string Email { get; init; }
+
+        [Required]
+        [MinLength(1)]
         public required string Password { get; init; }
+
+        [Url]
         public string? Image { get; init; }
+
         public string? Callback { get; init; }
     }
 
