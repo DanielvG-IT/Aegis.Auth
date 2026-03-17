@@ -1,13 +1,16 @@
 # Aegis.Auth Sample API
 
-This is a sample ASP.NET Core Web API project that demonstrates how to use the Aegis.Auth library for authentication.
+This is a sample ASP.NET Core Web API project that demonstrates how to use the Aegis.Auth core library together with the Aegis.Auth.Http endpoint package.
 
 ## Features
 
 - ✅ Email/Password authentication
+- ✅ Minimal API auth endpoints mapped from `Aegis.Auth.Http`
 - ✅ Secure session management with signed cookies
 - ✅ Cookie-based session caching
-- ✅ In-memory database for testing
+- ✅ Business domain example (`Projects` + `ProjectTasks`) tied to authenticated user
+- ✅ SQLite database for realistic local persistence
+- ✅ Strongly typed app-specific user extension (`AppUser.IsSpecial`)
 - ✅ Pre-seeded test user
 
 ## Test Credentials
@@ -71,6 +74,43 @@ Content-Type: application/json
 }
 ```
 
+### Business Endpoints (Authenticated)
+
+```http
+GET /api/projects/my
+```
+
+Returns projects owned by the currently authenticated user (resolved from Aegis session cookie).
+
+```http
+GET /api/projects/my/workspace
+```
+
+Returns tier/limits/usage from app business logic powered by the typed custom user field (`AppUser.IsSpecial`).
+
+```http
+POST /api/projects
+Content-Type: application/json
+
+{
+  "name": "Launch Marketing Site",
+  "description": "Coordinate tasks for the landing page release."
+}
+```
+
+```http
+GET /api/projects/{projectId}/tasks
+```
+
+```http
+POST /api/projects/{projectId}/tasks
+Content-Type: application/json
+
+{
+  "title": "Ship first public beta"
+}
+```
+
 ## Testing with curl
 
 ### Health Check
@@ -111,22 +151,71 @@ curl -X POST http://localhost:5000/api/auth/sign-up/email \
   -v
 ```
 
-Use a unique email if you run the same request more than once without resetting the in-memory database.
+Use a unique email if you run the same request more than once, or delete the local `.db` file to reset state.
+
+### Authenticated Business Flow
+
+```bash
+# 1) Sign in and store cookies
+curl -X POST http://localhost:5000/api/auth/sign-in/email \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"Password123!","rememberMe":true}' \
+  -c cookies.txt
+
+# 2) Read seeded business data for signed-in user
+curl http://localhost:5000/api/projects/my -b cookies.txt
+
+# 3) Read tier/limits for the current user
+curl http://localhost:5000/api/projects/my/workspace -b cookies.txt
+
+# 4) Create a project
+curl -X POST http://localhost:5000/api/projects \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Aegis Demo","description":"Show auth-powered business behavior"}' \
+  -b cookies.txt
+```
 
 ## Configuration
 
-The Aegis.Auth configuration is in `Program.cs`:
+The Aegis.Auth configuration and endpoint mapping are in `Program.cs`:
 
 - **Secret**: Used for signing cookies and tokens
 - **Email/Password**: Enabled with verification optional for testing
 - **Session**: 1-hour expiration with 5-minute cookie cache
 - **Cookie Cache**: Enabled to reduce database lookups
+- **Database**: SQLite (`ConnectionStrings:DefaultConnection`)
+
+Auth endpoints are mapped explicitly:
+
+```csharp
+app.MapAegisAuthEndpoints(options =>
+{
+  builder.Configuration.GetSection("AegisHttp").Bind(options);
+  options.MapEmailSignIn = true;
+  options.MapEmailSignUp = true;
+  options.MapSignOut = true;
+});
+```
+
+This lets you remove routes entirely (for example, no sign-up endpoint in production) instead of returning feature-disabled responses.
 
 ## Architecture
 
 - **Data/SampleAuthDbContext.cs**: EF Core DbContext implementing `IAuthDbContext`
-- **Data/DataSeeder.cs**: Seeds test data into the in-memory database
+- **Data/DataSeeder.cs**: Seeds test data into the SQLite database
 - **Controllers/HealthController.cs**: Health check and diagnostics endpoint
+- **Controllers/ProjectsController.cs**: Business API orchestrating authenticated workspace operations
+- **Services/ProjectWorkspaceService.cs**: Business workflow service with tier limits based on `AppUser.IsSpecial`
+- **Entities/AppUser.cs**: App-owned strongly typed extension of `Aegis.Auth.Entities.User`
 - **Program.cs**: Application configuration and startup
+- **Aegis.Auth.Http**: Package that maps auth endpoints via `app.MapAegisAuthEndpoints()`
 
-The actual authentication controllers come from the Aegis.Auth library (`SignInController`, etc.).
+The authentication endpoints are minimal APIs in `Aegis.Auth.Http` (not MVC controllers in the sample project).
+
+## Extending User Properties
+
+This sample demonstrates adding app-specific metadata to auth users with a strongly typed derived entity (`AppUser`) mapped as a base-type extension of `User`.
+
+- No change to `Aegis.Auth.Entities.User` required
+- Fully typed queries (`context.Users.Select(u => u.IsSpecial)`) in app services
+- Useful when you need user flags or profile metadata while keeping auth core reusable

@@ -2,7 +2,6 @@ using System.Text;
 
 using Aegis.Auth.Core.Crypto;
 
-using FluentAssertions;
 
 namespace Aegis.Auth.Tests.Crypto;
 
@@ -26,7 +25,7 @@ public sealed class AegisSignerTests
         var sig1 = AegisSigner.GenerateSignature("payload", TestSecret);
         var sig2 = AegisSigner.GenerateSignature("payload", TestSecret);
 
-        sig1.Should().Be(sig2, "HMAC must be deterministic for the same inputs");
+        Assert.Equal(sig2, sig1);
     }
 
     [Fact]
@@ -35,7 +34,7 @@ public sealed class AegisSignerTests
         var sig1 = AegisSigner.GenerateSignature("payload-a", TestSecret);
         var sig2 = AegisSigner.GenerateSignature("payload-b", TestSecret);
 
-        sig1.Should().NotBe(sig2);
+        Assert.NotEqual(sig2, sig1);
     }
 
     [Fact]
@@ -44,7 +43,7 @@ public sealed class AegisSignerTests
         var sig1 = AegisSigner.GenerateSignature("payload", TestSecret);
         var sig2 = AegisSigner.GenerateSignature("payload", AltSecret);
 
-        sig1.Should().NotBe(sig2);
+        Assert.NotEqual(sig2, sig1);
     }
 
     [Fact]
@@ -52,9 +51,9 @@ public sealed class AegisSignerTests
     {
         var sig = AegisSigner.GenerateSignature("some data", TestSecret);
 
-        sig.Should().NotContain("+");
-        sig.Should().NotContain("/");
-        sig.Should().NotContain("=");
+        Assert.DoesNotContain("+", sig);
+        Assert.DoesNotContain("/", sig);
+        Assert.DoesNotContain("=", sig);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -66,11 +65,11 @@ public sealed class AegisSignerTests
     {
         var signed = AegisSigner.Sign("token-value", TestSecret);
 
-        signed.Should().Contain(".");
+        Assert.Contains(".", signed);
         var parts = signed.Split('.');
-        parts.Should().HaveCount(2);
-        parts[0].Should().Be("token-value");
-        parts[1].Should().NotBeNullOrWhiteSpace();
+        Assert.Equal(2, parts.Length);
+        Assert.Equal("token-value", parts[0]);
+        Assert.False(string.IsNullOrWhiteSpace(parts[1]));
     }
 
     [Fact]
@@ -80,7 +79,7 @@ public sealed class AegisSignerTests
         var expectedSig = AegisSigner.GenerateSignature("my-token", TestSecret);
 
         var signaturePart = signed.Split('.')[1];
-        signaturePart.Should().Be(expectedSig);
+        Assert.Equal(expectedSig, signaturePart);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -94,7 +93,7 @@ public sealed class AegisSignerTests
 
         var result = AegisSigner.VerifySignature("payload", signature, TestSecret);
 
-        result.Should().BeTrue();
+        Assert.True(result);
     }
 
     [Fact]
@@ -105,7 +104,7 @@ public sealed class AegisSignerTests
 
         var result = AegisSigner.VerifySignature(parts[0], parts[1], TestSecret);
 
-        result.Should().BeTrue();
+        Assert.True(result);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -119,7 +118,7 @@ public sealed class AegisSignerTests
 
         var result = AegisSigner.VerifySignature("payload", signature, AltSecret);
 
-        result.Should().BeFalse();
+        Assert.False(result);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -138,7 +137,7 @@ public sealed class AegisSignerTests
 
         var result = AegisSigner.VerifySignature("payload", tampered, TestSecret);
 
-        result.Should().BeFalse();
+        Assert.False(result);
     }
 
     [Fact]
@@ -149,7 +148,7 @@ public sealed class AegisSignerTests
 
         var result = AegisSigner.VerifySignature("payload", truncated, TestSecret);
 
-        result.Should().BeFalse();
+        Assert.False(result);
     }
 
     [Fact]
@@ -160,7 +159,7 @@ public sealed class AegisSignerTests
 
         var result = AegisSigner.VerifySignature("payload", extended, TestSecret);
 
-        result.Should().BeFalse();
+        Assert.False(result);
     }
 
     [Fact]
@@ -168,7 +167,7 @@ public sealed class AegisSignerTests
     {
         var result = AegisSigner.VerifySignature("payload", "", TestSecret);
 
-        result.Should().BeFalse();
+        Assert.False(result);
     }
 
     [Fact]
@@ -176,7 +175,7 @@ public sealed class AegisSignerTests
     {
         var result = AegisSigner.VerifySignature("payload", "totally-random-garbage", TestSecret);
 
-        result.Should().BeFalse();
+        Assert.False(result);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -190,7 +189,7 @@ public sealed class AegisSignerTests
 
         var result = AegisSigner.VerifySignature("modified-payload", signature, TestSecret);
 
-        result.Should().BeFalse();
+        Assert.False(result);
     }
 
     [Fact]
@@ -200,7 +199,7 @@ public sealed class AegisSignerTests
 
         var result = AegisSigner.VerifySignature("payload ", signature, TestSecret);
 
-        result.Should().BeFalse("trailing space changes the HMAC");
+        Assert.False(result, "trailing space changes the HMAC");
     }
 
     [Fact]
@@ -210,7 +209,7 @@ public sealed class AegisSignerTests
 
         var result = AegisSigner.VerifySignature("", signature, TestSecret);
 
-        result.Should().BeTrue();
+        Assert.True(result);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -222,10 +221,10 @@ public sealed class AegisSignerTests
     {
         var signed = AegisSigner.Sign("", TestSecret);
 
-        signed.Should().StartWith(".");
+        Assert.StartsWith(".", signed);
         var parts = signed.Split('.');
-        parts[0].Should().BeEmpty();
-        parts[1].Should().NotBeNullOrWhiteSpace();
+        Assert.Empty(parts[0]);
+        Assert.False(string.IsNullOrWhiteSpace(parts[1]));
     }
 
     [Fact]
@@ -239,8 +238,8 @@ public sealed class AegisSignerTests
         var payload = signed[..lastDot];
         var sig = signed[(lastDot + 1)..];
 
-        payload.Should().Be("part1.part2.part3");
-        AegisSigner.VerifySignature(payload, sig, TestSecret).Should().BeTrue();
+        Assert.Equal("part1.part2.part3", payload);
+        Assert.True(AegisSigner.VerifySignature(payload, sig, TestSecret));
     }
 
     [Fact]
@@ -248,8 +247,8 @@ public sealed class AegisSignerTests
     {
         var sig = AegisSigner.GenerateSignature("日本語テスト🔐", TestSecret);
 
-        sig.Should().NotBeNullOrWhiteSpace();
-        AegisSigner.VerifySignature("日本語テスト🔐", sig, TestSecret).Should().BeTrue();
+        Assert.False(string.IsNullOrWhiteSpace(sig));
+        Assert.True(AegisSigner.VerifySignature("日本語テスト🔐", sig, TestSecret));
     }
 
     [Fact]
@@ -259,8 +258,8 @@ public sealed class AegisSignerTests
 
         var sig = AegisSigner.GenerateSignature(largePayload, TestSecret);
 
-        sig.Should().NotBeNullOrWhiteSpace();
-        AegisSigner.VerifySignature(largePayload, sig, TestSecret).Should().BeTrue();
+        Assert.False(string.IsNullOrWhiteSpace(sig));
+        Assert.True(AegisSigner.VerifySignature(largePayload, sig, TestSecret));
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -278,7 +277,7 @@ public sealed class AegisSignerTests
 
         var result = AegisSigner.VerifySignature("payload", fakeSig, TestSecret);
 
-        result.Should().BeFalse();
+        Assert.False(result);
     }
 
     [Fact]
@@ -289,7 +288,7 @@ public sealed class AegisSignerTests
         // Use signature from payload-A to verify payload-B (replay attack)
         var result = AegisSigner.VerifySignature("payload-B", sigForA, TestSecret);
 
-        result.Should().BeFalse();
+        Assert.False(result);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -305,6 +304,6 @@ public sealed class AegisSignerTests
         var sig = AegisSigner.GenerateSignature(payload, TestSecret);
 
         // HMAC-SHA256 = 32 bytes. Base64Url of 32 bytes = ceil(32*4/3) = 43 chars (no padding)
-        sig.Should().HaveLength(43, "HMAC-SHA256 base64url is always 43 chars");
+        Assert.Equal(43, sig.Length);
     }
 }

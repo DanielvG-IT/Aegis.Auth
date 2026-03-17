@@ -4,6 +4,7 @@
 @baseUrl = http://localhost:5000
 @contentType = application/json
 @newUserEmail = new-user-{{$timestamp}}@example.com
+@sessionCookie = REPLACE_WITH_AEGIS_SESSION_COOKIE
 
 ### Health Check - Get API status and configuration
 GET {{baseUrl}}/api/health
@@ -44,6 +45,7 @@ Content-Type: {{contentType}}
 ###
 
 ### Sign In - Valid credentials with remember me
+### @name signIn
 POST {{baseUrl}}/api/auth/sign-in/email
 Content-Type: {{contentType}}
 
@@ -53,6 +55,11 @@ Content-Type: {{contentType}}
   "rememberMe": true,
   "callback": null
 }
+
+###
+
+### After running sign-in, copy the `aegis.session` or `__Host-aegis.session`
+### cookie value into @sessionCookie above, then run the authenticated requests.
 
 ###
 
@@ -123,5 +130,50 @@ Content-Type: {{contentType}}
 
 ### Sign Out - Sign out current user (run after signing in above)
 POST {{baseUrl}}/api/auth/sign-out
+
+###
+
+### Business: Get my projects (requires auth cookie from sign-in)
+GET {{baseUrl}}/api/projects/my
+Accept: application/json
+Cookie: aegis.session={{sessionCookie}}
+
+###
+
+### Business: Get my workspace tier/limits (typed AppUser.IsSpecial)
+GET {{baseUrl}}/api/projects/my/workspace
+Accept: application/json
+Cookie: aegis.session={{sessionCookie}}
+
+###
+
+### Business: Create a project (requires auth cookie)
+### @name createProject
+POST {{baseUrl}}/api/projects
+Content-Type: {{contentType}}
+Cookie: aegis.session={{sessionCookie}}
+
+{
+  "name": "Aegis API Integration",
+  "description": "Use Aegis-authenticated endpoints in a real app workflow"
+}
+
+###
+
+### Business: List tasks for created project
+GET {{baseUrl}}/api/projects/{{createProject.response.body.$.id}}/tasks
+Accept: application/json
+Cookie: aegis.session={{sessionCookie}}
+
+###
+
+### Business: Add task to project (requires auth cookie)
+POST {{baseUrl}}/api/projects/{{createProject.response.body.$.id}}/tasks
+Content-Type: {{contentType}}
+Cookie: aegis.session={{sessionCookie}}
+
+{
+  "title": "Hook dashboard to authenticated project API"
+}
 
 ###

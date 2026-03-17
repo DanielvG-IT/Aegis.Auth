@@ -9,22 +9,23 @@ using EmailValidation;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Aegis.Auth.Features.SignIn
 {
     public interface ISignInService
     {
-        Task<Result<SignInResult>> SignInEmail(SignInEmailInput input);
+        Task<Result<SignInResult>> SignInEmail(SignInEmailInput input, CancellationToken cancellationToken = default);
     }
 
-    internal sealed class SignInService(AegisAuthOptions options, ILoggerFactory loggerFactory, IAuthDbContext dbContext, ISessionService sessionService) : ISignInService
+    internal sealed class SignInService(IOptions<AegisAuthOptions> optionsAccessor, ILoggerFactory loggerFactory, IAuthDbContext dbContext, ISessionService sessionService) : ISignInService
     {
         private readonly ISessionService _sessionService = sessionService;
-        private readonly AegisAuthOptions _options = options;
+        private readonly AegisAuthOptions _options = optionsAccessor.Value;
         private readonly IAuthDbContext _db = dbContext;
         private readonly ILogger _logger = loggerFactory.CreateLogger<SignInService>();
 
-        public async Task<Result<SignInResult>> SignInEmail(SignInEmailInput input)
+        public async Task<Result<SignInResult>> SignInEmail(SignInEmailInput input, CancellationToken cancellationToken = default)
         {
             _logger.SignInAttemptInitiated();
 
@@ -53,7 +54,7 @@ namespace Aegis.Auth.Features.SignIn
             {
                 user = await _db.Users
                     .Include(u => u.Accounts.Where(a => a.ProviderId == "credential"))
-                    .FirstOrDefaultAsync(u => u.Email == normalizedEmail);
+                    .FirstOrDefaultAsync(u => u.Email == normalizedEmail, cancellationToken);
                 _logger.SignInDatabaseLookupCompleted();
             }
             catch (Exception ex)
@@ -152,7 +153,7 @@ namespace Aegis.Auth.Features.SignIn
             };
 
             // Create and save session
-            Result<Session> session = await _sessionService.CreateSessionAsync(sessionInput);
+            Result<Session> session = await _sessionService.CreateSessionAsync(sessionInput, cancellationToken);
             if (session.IsSuccess is false || session.Value is null)
             {
                 _logger.SignInSessionCreationFailed(user.Id);

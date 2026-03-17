@@ -9,22 +9,23 @@ using EmailValidation;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Aegis.Auth.Features.SignUp
 {
     public interface ISignUpService
     {
-        Task<Result<SignUpResult>> SignUpEmail(SignUpEmailInput input);
+        Task<Result<SignUpResult>> SignUpEmail(SignUpEmailInput input, CancellationToken cancellationToken = default);
     }
 
-    internal sealed partial class SignUpService(AegisAuthOptions options, ILoggerFactory loggerFactory, IAuthDbContext dbContext, ISessionService sessionService) : ISignUpService
+    internal sealed partial class SignUpService(IOptions<AegisAuthOptions> optionsAccessor, ILoggerFactory loggerFactory, IAuthDbContext dbContext, ISessionService sessionService) : ISignUpService
     {
         private readonly IAuthDbContext _db = dbContext;
-        private readonly AegisAuthOptions _options = options;
+        private readonly AegisAuthOptions _options = optionsAccessor.Value;
         private readonly ISessionService _sessionService = sessionService;
         private readonly ILogger _logger = loggerFactory.CreateLogger<SignUpService>();
 
-        public async Task<Result<SignUpResult>> SignUpEmail(SignUpEmailInput input)
+        public async Task<Result<SignUpResult>> SignUpEmail(SignUpEmailInput input, CancellationToken cancellationToken = default)
         {
             _logger.SignUpAttemptInitiated();
 
@@ -70,7 +71,7 @@ namespace Aegis.Auth.Features.SignUp
                 }
             }
 
-            var exists = await _db.Users.AsNoTracking().AnyAsync(u => u.Email == normalizedEmail);
+            var exists = await _db.Users.AsNoTracking().AnyAsync(u => u.Email == normalizedEmail, cancellationToken);
             if (exists)
             {
                 _logger.SignUpEmailAlreadyExists();
@@ -109,7 +110,7 @@ namespace Aegis.Auth.Features.SignUp
 
             try
             {
-                await _db.SaveChangesAsync();
+                await _db.SaveChangesAsync(cancellationToken);
                 _logger.SignUpSuccessful(user.Id);
             }
             catch (DbUpdateException ex)
@@ -160,7 +161,7 @@ namespace Aegis.Auth.Features.SignUp
                     UserAgent = input.UserAgent,
                     DontRememberMe = true
                 };
-                session = (await _sessionService.CreateSessionAsync(sessionInput)).Value;
+                session = (await _sessionService.CreateSessionAsync(sessionInput, cancellationToken)).Value;
             }
 
             return new SignUpResult { User = user, Session = session, CallbackUrl = input.Callback };

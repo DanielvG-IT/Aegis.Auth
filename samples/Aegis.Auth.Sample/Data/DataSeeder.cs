@@ -1,5 +1,6 @@
 using Aegis.Auth.Entities;
 using Aegis.Auth.Options;
+using Aegis.Auth.Sample.Entities;
 
 namespace Aegis.Auth.Sample.Data;
 
@@ -16,13 +17,14 @@ public static class DataSeeder
         DateTime now = DateTime.UtcNow;
 
         // Create a test user
-        var user = new User
+        var user = new AppUser
         {
             Id = Guid.CreateVersion7().ToString(),
             Email = "test@example.com",
             Name = "Test User",
             EmailVerified = true,
             Image = "",
+            IsSpecial = true,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -45,6 +47,38 @@ public static class DataSeeder
         };
 
         context.Accounts.Add(account);
+
+        // Create app business data linked to the auth user.
+        var project = new Project
+        {
+            Id = Guid.CreateVersion7().ToString(),
+            OwnerUserId = user.Id,
+            Name = "Ship Aegis.Auth v0.1",
+            Description = "Demo project seeded to show app-specific business logic using Aegis user identity.",
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+        context.Projects.Add(project);
+
+        context.ProjectTasks.AddRange(
+            new ProjectTask
+            {
+                Id = Guid.CreateVersion7().ToString(),
+                ProjectId = project.Id,
+                Title = "Wire up sign-in and session cookie",
+                IsDone = true,
+                CreatedAt = now,
+                CompletedAt = now,
+            },
+            new ProjectTask
+            {
+                Id = Guid.CreateVersion7().ToString(),
+                ProjectId = project.Id,
+                Title = "Build first business endpoint",
+                IsDone = false,
+                CreatedAt = now,
+                CompletedAt = null,
+            });
 
         await context.SaveChangesAsync();
     }

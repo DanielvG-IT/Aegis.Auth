@@ -1,16 +1,35 @@
 using Aegis.Auth.Extensions;
+using Aegis.Auth.Http.Extensions;
 using Aegis.Auth.Options;
 using Aegis.Auth.Sample.Data;
+using Aegis.Auth.Sample.Services;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
+var configuredSecret =
+    builder.Configuration["AegisAuth:Secret"]
+    ?? Environment.GetEnvironmentVariable("AEGIS_AUTH_SECRET")
+    ?? (builder.Environment.IsDevelopment()
+        ? "development-only-secret-change-me-at-least-32-chars"
+        : string.Empty);
+
+if (string.IsNullOrWhiteSpace(configuredSecret) || configuredSecret.Length < 32)
+{
+    throw new InvalidOperationException("Configure AegisAuth:Secret (or AEGIS_AUTH_SECRET) with at least 32 characters.");
+}
+
 // Add services to the container.
 
-// Configure the database (InMemory for testing)
+var connectionString =
+    builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? "Data Source=aegis-auth-sample.db";
+
+// Configure the database (SQLite for realistic local persistence)
 builder.Services.AddDbContext<SampleAuthDbContext>(options =>
-    options.UseInMemoryDatabase("AegisAuthTestDb"));
+    options.UseSqlite(connectionString));
 
 
 // Add a memory cache to mock distributed cache
@@ -21,7 +40,7 @@ builder.Services.AddAegisAuth<SampleAuthDbContext>(options =>
 {
     options.AppName = "AegisAuthSample";
     options.BaseURL = "http://localhost:5000";
-    options.Secret = "load-this-secret-from-secure-place-like-environment-variables"; // Must be 32 chars or longer
+    options.Secret = configuredSecret;
 
     // Enable email/password authentication
     options.EmailAndPassword.Enabled = true;
@@ -36,6 +55,8 @@ builder.Services.AddAegisAuth<SampleAuthDbContext>(options =>
 });
 
 builder.Services.AddControllers();
+builder.Services.AddScoped<IProjectWorkspaceService, ProjectWorkspaceService>();
+builder.Services.AddProblemDetails();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
@@ -45,7 +66,8 @@ WebApplication app = builder.Build();
 using (IServiceScope scope = app.Services.CreateScope())
 {
     SampleAuthDbContext context = scope.ServiceProvider.GetRequiredService<SampleAuthDbContext>();
-    AegisAuthOptions options = scope.ServiceProvider.GetRequiredService<Aegis.Auth.Options.AegisAuthOptions>();
+    await context.Database.EnsureCreatedAsync();
+    AegisAuthOptions options = scope.ServiceProvider.GetRequiredService<IOptions<AegisAuthOptions>>().Value;
     await DataSeeder.SeedDataAsync(context, options);
 }
 
@@ -54,12 +76,21 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+else
+{
+    app.UseExceptionHandler();
+    app.UseHsts();
+}
 
 app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapAegisAuthEndpoints(options =>
+{
+    builder.Configuration.GetSection("AegisHttp").Bind(options);
+});
 
 Console.WriteLine("🚀 Aegis Auth Sample API is starting...");
 Console.WriteLine("📝 Test credentials:");

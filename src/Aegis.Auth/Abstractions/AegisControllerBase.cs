@@ -1,6 +1,8 @@
 using Aegis.Auth.Constants;
+using Aegis.Auth.Extensions;
 using Aegis.Auth.Options;
 
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Aegis.Auth.Abstractions
@@ -14,29 +16,7 @@ namespace Aegis.Auth.Abstractions
         /// </summary>
         protected static string? ValidateCallback(string? callback, AegisAuthOptions options)
         {
-            if (string.IsNullOrWhiteSpace(callback))
-                return null;
-
-            // Allow relative paths (e.g. "/dashboard")
-            if (callback.StartsWith('/') && !callback.StartsWith("//"))
-                return callback;
-
-            // Reject anything that isn't a valid absolute URI
-            if (!Uri.TryCreate(callback, UriKind.Absolute, out Uri? uri))
-                return null;
-
-            // Only allow http/https schemes
-            if (uri.Scheme is not ("http" or "https"))
-                return null;
-
-            // Must match a trusted origin
-            if (options.TrustedOrigins is null || options.TrustedOrigins.Count == 0)
-                return null;
-
-            var origin = $"{uri.Scheme}://{uri.Authority}";
-            return options.TrustedOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase)
-              ? callback
-              : null;
+            return CallbackValidator.Validate(callback, options);
         }
 
         protected IActionResult HandleResult<T>(Result<T> result)
@@ -56,19 +36,44 @@ namespace Aegis.Auth.Abstractions
             return result.ErrorCode switch
             {
                 // 401 Unauthorized
-                AuthErrors.Identity.InvalidCredentials => Unauthorized(result) as ObjectResult,
-                AuthErrors.Identity.InvalidEmailOrPassword => Unauthorized(result) as ObjectResult,
+                AuthErrors.Identity.InvalidCredentials => CreateProblem(result, StatusCodes.Status401Unauthorized, "Unauthorized"),
+                AuthErrors.Identity.InvalidEmailOrPassword => CreateProblem(result, StatusCodes.Status401Unauthorized, "Unauthorized"),
 
                 // 403 Forbidden
-                AuthErrors.Identity.EmailNotVerified => StatusCode(403, result) as ObjectResult,
-                AuthErrors.System.FeatureDisabled => StatusCode(403, result) as ObjectResult,
+                AuthErrors.Identity.EmailNotVerified => CreateProblem(result, StatusCodes.Status403Forbidden, "Forbidden"),
+                AuthErrors.System.FeatureDisabled => CreateProblem(result, StatusCodes.Status403Forbidden, "Forbidden"),
 
                 // 404 Not Found
-                AuthErrors.System.ProviderNotFound => NotFound(result) as ObjectResult,
+                AuthErrors.System.ProviderNotFound => CreateProblem(result, StatusCodes.Status404NotFound, "Not Found"),
+                AuthErrors.Session.SessionNotFound => CreateProblem(result, StatusCodes.Status404NotFound, "Not Found"),
+
+                // 500 Internal Server Error
+                AuthErrors.System.InternalError => CreateProblem(result, StatusCodes.Status500InternalServerError, "Internal Server Error"),
+                AuthErrors.System.FailedToCreateSession => CreateProblem(result, StatusCodes.Status500InternalServerError, "Internal Server Error"),
 
                 // 400 Bad Request (Default for validation/rest)
-                _ => BadRequest(result) as ObjectResult
+                _ => CreateProblem(result, StatusCodes.Status400BadRequest, "Bad Request")
             };
+        }
+
+        private ObjectResult CreateProblem(Result result, int statusCode, string title)
+        {
+            var problem = new ProblemDetails
+            {
+                Status = statusCode,
+                Title = title,
+                Detail = result.Message,
+                Type = $"https://httpstatuses.com/{statusCode}",
+                Instance = HttpContext.Request.Path,
+            };
+
+            if (string.IsNullOrWhiteSpace(result.ErrorCode) is false)
+            {
+                problem.Extensions["errorCode"] = result.ErrorCode;
+            }
+
+            return StatusCode(statusCode, problem) as ObjectResult
+                ?? new ObjectResult(problem) { StatusCode = statusCode };
         }
     }
 }

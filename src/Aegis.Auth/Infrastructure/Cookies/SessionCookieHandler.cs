@@ -130,7 +130,7 @@ namespace Aegis.Auth.Infrastructure.Cookies
 
             // Decrypt or decode based on mode
             CookieCacheMode mode = _options.Session.CookieCache?.Mode ?? CookieCacheMode.Compact;
-            string? finalJson = mode switch
+            var finalJson = mode switch
             {
                 CookieCacheMode.Encrypted => AegisCrypto.Decrypt(cookieValue, _options.Secret),
                 _ => AegisCrypto.FromBase64UrlToString(cookieValue), // Compact: signed but readable
