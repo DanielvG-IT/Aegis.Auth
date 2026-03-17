@@ -210,7 +210,8 @@ public sealed class SignOutServiceTests : IDisposable
 
         Result result = await _sut.SignOut(new SignOutInput { Token = "user-token" });
 
-        Assert.True(result.IsSuccess); _sessionMock.Verify(
+        Assert.True(result.IsSuccess);
+        _sessionMock.Verify(
             s => s.RevokeSessionAsync(It.Is<SessionDeleteInput>(i => i.User.Id == user.Id), It.IsAny<CancellationToken>()),
             Times.Once);
     }

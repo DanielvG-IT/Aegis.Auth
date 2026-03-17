@@ -1,4 +1,5 @@
 using Aegis.Auth.Constants;
+using Aegis.Auth.Extensions;
 using Aegis.Auth.Options;
 
 using Microsoft.AspNetCore.Http;
@@ -15,29 +16,7 @@ namespace Aegis.Auth.Abstractions
         /// </summary>
         protected static string? ValidateCallback(string? callback, AegisAuthOptions options)
         {
-            if (string.IsNullOrWhiteSpace(callback))
-                return null;
-
-            // Allow relative paths (e.g. "/dashboard")
-            if (callback.StartsWith('/') && !callback.StartsWith("//"))
-                return callback;
-
-            // Reject anything that isn't a valid absolute URI
-            if (!Uri.TryCreate(callback, UriKind.Absolute, out Uri? uri))
-                return null;
-
-            // Only allow http/https schemes
-            if (uri.Scheme is not ("http" or "https"))
-                return null;
-
-            // Must match a trusted origin
-            if (options.TrustedOrigins is null || options.TrustedOrigins.Count == 0)
-                return null;
-
-            var origin = $"{uri.Scheme}://{uri.Authority}";
-            return options.TrustedOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase)
-              ? callback
-              : null;
+            return CallbackValidator.Validate(callback, options);
         }
 
         protected IActionResult HandleResult<T>(Result<T> result)

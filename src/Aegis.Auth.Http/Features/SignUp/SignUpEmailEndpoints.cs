@@ -53,7 +53,7 @@ internal static class SignUpEmailEndpoints
             cookieHandler.SetSessionCookie(httpContext, data.Session, data.User, rememberMe: false);
         }
 
-        var validatedCallback = ValidateCallback(request.Callback, optionsAccessor.Value);
+        var validatedCallback = CallbackValidator.Validate(request.Callback, optionsAccessor.Value);
         var shouldRedirect = validatedCallback is not null;
         if (shouldRedirect)
         {
@@ -67,36 +67,5 @@ internal static class SignUpEmailEndpoints
             Redirect = shouldRedirect,
             Url = validatedCallback,
         });
-    }
-
-    private static string? ValidateCallback(string? callback, AegisAuthOptions options)
-    {
-        if (string.IsNullOrWhiteSpace(callback))
-        {
-            return null;
-        }
-
-        if (callback.StartsWith('/') && !callback.StartsWith("//"))
-        {
-            return callback;
-        }
-
-        if (!Uri.TryCreate(callback, UriKind.Absolute, out Uri? uri))
-        {
-            return null;
-        }
-
-        if (uri.Scheme is not ("http" or "https"))
-        {
-            return null;
-        }
-
-        if (options.TrustedOrigins is null || options.TrustedOrigins.Count == 0)
-        {
-            return null;
-        }
-
-        var origin = $"{uri.Scheme}://{uri.Authority}";
-        return options.TrustedOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase) ? callback : null;
     }
 }

@@ -187,7 +187,8 @@ public sealed class SessionServiceTests : IDisposable
 
         Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user));
 
-        Assert.True(result.IsSuccess); Session? dbSession = _fixture.DbContext.Sessions.SingleOrDefault(s => s.Id == result.Value!.Id);
+        Assert.True(result.IsSuccess);
+        Session? dbSession = _fixture.DbContext.Sessions.SingleOrDefault(s => s.Id == result.Value!.Id);
         Assert.NotNull(dbSession);
         Assert.Equal(result.Value!.Token, dbSession!.Token);
     }
@@ -203,7 +204,8 @@ public sealed class SessionServiceTests : IDisposable
 
         Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user));
 
-        Assert.True(result.IsSuccess);        // The cache should have the session token as a key
+        Assert.True(result.IsSuccess);
+        // The cache should have the session token as a key
         Assert.True(_cacheStore.ContainsKey(result.Value!.Token));
     }
 
@@ -226,7 +228,8 @@ public sealed class SessionServiceTests : IDisposable
         Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user));
 
         var registryKey = $"active-sessions-{user.Id}";
-        Assert.True(_cacheStore.ContainsKey(registryKey)); var registryJson = _cacheStore[registryKey].Value;
+        Assert.True(_cacheStore.ContainsKey(registryKey));
+        var registryJson = _cacheStore[registryKey].Value;
         Assert.Contains(result.Value!.Token, registryJson);
     }
 
@@ -499,6 +502,7 @@ public sealed class SessionServiceTests : IDisposable
         // Pass a cloned (untracked) user to avoid EF navigation cycles
         // that cause JsonSerializer circular reference errors
         Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user));
-        Assert.True(result.IsSuccess); return result.Value!;
+        Assert.True(result.IsSuccess);
+        return result.Value!;
     }
 }

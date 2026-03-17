@@ -221,7 +221,8 @@ public sealed class AegisSignerTests
     {
         var signed = AegisSigner.Sign("", TestSecret);
 
-        Assert.StartsWith(".", signed); var parts = signed.Split('.');
+        Assert.StartsWith(".", signed);
+        var parts = signed.Split('.');
         Assert.Empty(parts[0]);
         Assert.False(string.IsNullOrWhiteSpace(parts[1]));
     }

@@ -29,8 +29,8 @@ public sealed class AegisAuthEndpointMapOptions
 public static class AegisAuthEndpointRouteBuilderExtensions
 {
     public static IEndpointRouteBuilder MapAegisAuthEndpoints(
-      this IEndpointRouteBuilder endpoints,
-      Action<AegisAuthEndpointMapOptions>? configure = null)
+                this IEndpointRouteBuilder endpoints,
+                Action<AegisAuthEndpointMapOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 

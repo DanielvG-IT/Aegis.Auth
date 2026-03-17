@@ -331,7 +331,8 @@ public sealed class SignUpServiceTests : IDisposable
 
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput(email: "hashcheck@test.com", password: rawPassword));
 
-        Assert.True(result.IsSuccess); Account account = _fixture.DbContext.Accounts.Single(a => a.UserId == result.Value!.User.Id);
+        Assert.True(result.IsSuccess);
+        Account account = _fixture.DbContext.Accounts.Single(a => a.UserId == result.Value!.User.Id);
         Assert.NotEqual(rawPassword, account.PasswordHash);
         Assert.Equal($"hashed:{rawPassword}", account.PasswordHash);
     }
@@ -363,7 +364,8 @@ public sealed class SignUpServiceTests : IDisposable
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput());
 
         Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Value!.Session); _sessionMock.Verify(s => s.CreateSessionAsync(It.Is<SessionCreateInput>(
+        Assert.NotNull(result.Value!.Session);
+        _sessionMock.Verify(s => s.CreateSessionAsync(It.Is<SessionCreateInput>(
             i => i.DontRememberMe == true)), Times.Once);
     }
 
@@ -375,7 +377,8 @@ public sealed class SignUpServiceTests : IDisposable
         Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput());
 
         Assert.True(result.IsSuccess);
-        Assert.Null(result.Value!.Session); _sessionMock.Verify(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Null(result.Value!.Session);
+        _sessionMock.Verify(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
