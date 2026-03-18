@@ -163,9 +163,7 @@ namespace Aegis.Auth.Infrastructure.Cookies
                 Session = envelope.Session
             };
             var signableJson = JsonSerializer.Serialize(signableEnvelope);
-            var expectedSignature = AegisSigner.GenerateSignature(signableJson, _options.Secret);
-
-            if (envelope.Signature != expectedSignature)
+            if (!AegisSigner.VerifySignature(signableJson, envelope.Signature, _options.Secret))
                 return null;
 
             return envelope.Session.Session;

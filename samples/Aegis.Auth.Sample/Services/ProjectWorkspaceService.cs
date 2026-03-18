@@ -119,7 +119,7 @@ public sealed class ProjectWorkspaceService(SampleAuthDbContext dbContext) : IPr
 
     public async Task<CreateProjectResult?> CreateProjectAsync(string userId, string name, string? description, CancellationToken cancellationToken = default)
     {
-        var profile = await GetTierProfileAsync(userId, cancellationToken);
+        UserTierProfile? profile = await GetTierProfileAsync(userId, cancellationToken);
         if (profile is null)
         {
             return null;
@@ -134,7 +134,7 @@ public sealed class ProjectWorkspaceService(SampleAuthDbContext dbContext) : IPr
             return null;
         }
 
-        var now = DateTime.UtcNow;
+        DateTime now = DateTime.UtcNow;
         var project = new Project
         {
             Id = Guid.CreateVersion7().ToString(),
@@ -185,13 +185,13 @@ public sealed class ProjectWorkspaceService(SampleAuthDbContext dbContext) : IPr
 
     public async Task<AddProjectTaskResult?> AddTaskAsync(string userId, string projectId, string title, CancellationToken cancellationToken = default)
     {
-        var profile = await GetTierProfileAsync(userId, cancellationToken);
+        UserTierProfile? profile = await GetTierProfileAsync(userId, cancellationToken);
         if (profile is null)
         {
             return null;
         }
 
-        var project = await _db.Projects
+        Project? project = await _db.Projects
             .FirstOrDefaultAsync(p => p.Id == projectId && p.OwnerUserId == userId, cancellationToken);
 
         if (project is null)
@@ -208,7 +208,7 @@ public sealed class ProjectWorkspaceService(SampleAuthDbContext dbContext) : IPr
             return null;
         }
 
-        var now = DateTime.UtcNow;
+        DateTime now = DateTime.UtcNow;
         var task = new ProjectTask
         {
             Id = Guid.CreateVersion7().ToString(),
