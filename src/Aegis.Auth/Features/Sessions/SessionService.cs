@@ -91,14 +91,10 @@ namespace Aegis.Auth.Features.Sessions
                         var currentListJson = await _cache.GetStringAsync(registryKey, cancellationToken);
 
                         List<SessionReference> list = [];
-                        if (string.IsNullOrWhiteSpace(currentListJson) is false)
+                        if (TryDeserializeSessionReferences(currentListJson, out List<SessionReference>? cachedList))
                         {
-                            List<SessionReference>? cachedList = JsonSerializer.Deserialize<List<SessionReference>>(currentListJson);
-                            if (cachedList is not null)
-                            {
-                                // Filter: remove expired and duplicates
-                                list = [.. cachedList.Where(s => s.ExpiresAt > nowUnixMs && s.Token != data.Token)];
-                            }
+                            // Filter: remove expired and duplicates
+                            list = [.. cachedList!.Where(s => s.ExpiresAt > nowUnixMs && s.Token != data.Token)];
                         }
 
                         // 2. Add new session and sort
@@ -117,8 +113,8 @@ namespace Aegis.Auth.Features.Sessions
                             var verifyJson = await _cache.GetStringAsync(registryKey, cancellationToken);
                             if (!string.IsNullOrWhiteSpace(verifyJson))
                             {
-                                List<SessionReference>? verifyList = JsonSerializer.Deserialize<List<SessionReference>>(verifyJson);
-                                if (verifyList?.Any(s => s.Token == data.Token) == true)
+
+                                if (TryDeserializeSessionReferences(verifyJson, out List<SessionReference>? verifyList) && verifyList?.Any(s => s.Token == data.Token) == true)
                                 {
                                     registryUpdated = true;
                                 }
@@ -169,36 +165,32 @@ namespace Aegis.Auth.Features.Sessions
                 var registryKey = RegistryKeyPrefix + input.User.Id;
                 var registryJson = await _cache.GetStringAsync(registryKey, cancellationToken);
 
-                if (string.IsNullOrWhiteSpace(registryJson) is false)
+                if (TryDeserializeSessionReferences(registryJson, out List<SessionReference>? list))
                 {
-                    List<SessionReference>? list = JsonSerializer.Deserialize<List<SessionReference>>(registryJson);
-                    if (list is not null)
-                    {
-                        var nowUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                        // Remove the revoked session and any expired ones
-                        list = [.. list.Where(s => s.Token != token && s.ExpiresAt > nowUnixMs)];
+                    var nowUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                    // Remove the revoked session and any expired ones
+                    list = [.. list!.Where(s => s.Token != token && s.ExpiresAt > nowUnixMs)];
 
-                        if (list.Count == 0)
+                    if (list.Count == 0)
+                    {
+                        // No sessions left — delete the key entirely (Redis-friendly)
+                        await _cache.RemoveAsync(registryKey, cancellationToken);
+                    }
+                    else
+                    {
+                        // Recalculate TTL based on the furthest-expiring remaining session (round up)
+                        list.Sort((a, b) => a.ExpiresAt.CompareTo(b.ExpiresAt));
+                        var furthestExp = list[^1].ExpiresAt;
+                        var ttlSeconds = (long)Math.Ceiling((furthestExp - nowUnixMs) / 1000.0);
+
+                        if (ttlSeconds > 0)
                         {
-                            // No sessions left — delete the key entirely (Redis-friendly)
-                            await _cache.RemoveAsync(registryKey, cancellationToken);
+                            await _cache.SetStringAsync(registryKey, JsonSerializer.Serialize(list),
+                                                                new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(ttlSeconds) }, cancellationToken);
                         }
                         else
                         {
-                            // Recalculate TTL based on the furthest-expiring remaining session (round up)
-                            list.Sort((a, b) => a.ExpiresAt.CompareTo(b.ExpiresAt));
-                            var furthestExp = list[^1].ExpiresAt;
-                            var ttlSeconds = (long)Math.Ceiling((furthestExp - nowUnixMs) / 1000.0);
-
-                            if (ttlSeconds > 0)
-                            {
-                                await _cache.SetStringAsync(registryKey, JsonSerializer.Serialize(list),
-                                                                    new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(ttlSeconds) }, cancellationToken);
-                            }
-                            else
-                            {
-                                await _cache.RemoveAsync(registryKey, cancellationToken);
-                            }
+                            await _cache.RemoveAsync(registryKey, cancellationToken);
                         }
                     }
                 }
@@ -237,21 +229,17 @@ namespace Aegis.Auth.Features.Sessions
                 var registryKey = RegistryKeyPrefix + userId;
                 var registryJson = await _cache.GetStringAsync(registryKey, cancellationToken);
 
-                if (string.IsNullOrWhiteSpace(registryJson) is false)
+                if (TryDeserializeSessionReferences(registryJson, out List<SessionReference>? list))
                 {
-                    List<SessionReference>? list = JsonSerializer.Deserialize<List<SessionReference>>(registryJson);
-                    if (list is not null)
+                    // Remove each cached session
+                    foreach (SessionReference entry in list!)
                     {
-                        // Remove each cached session
-                        foreach (SessionReference entry in list)
-                        {
-                            await _cache.RemoveAsync(entry.Token, cancellationToken);
-                        }
+                        await _cache.RemoveAsync(entry.Token, cancellationToken);
                     }
-
-                    // Delete the registry key itself
-                    await _cache.RemoveAsync(registryKey, cancellationToken);
                 }
+
+                // Delete the registry key itself
+                await _cache.RemoveAsync(registryKey, cancellationToken);
             }
 
             // 2. Remove all from database
@@ -275,6 +263,26 @@ namespace Aegis.Auth.Features.Sessions
 
             _logger.SessionRevokedAll(userId);
             return Result.Success();
+        }
+
+        private static bool TryDeserializeSessionReferences(string? json, out List<SessionReference>? list)
+        {
+            list = null;
+
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return false;
+            }
+
+            try
+            {
+                list = JsonSerializer.Deserialize<List<SessionReference>>(json);
+                return list is not null;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }

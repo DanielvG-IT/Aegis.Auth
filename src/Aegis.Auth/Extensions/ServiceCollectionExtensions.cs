@@ -31,7 +31,7 @@ namespace Aegis.Auth.Extensions
             // Backward compatibility for existing consumers resolving AegisAuthOptions directly.
             services.AddSingleton(sp => sp.GetRequiredService<IOptions<AegisAuthOptions>>().Value);
 
-            // Register AegisCookieManager
+            // Register cookie handler
             services.AddScoped(sp =>
             {
                 IHostEnvironment env = sp.GetRequiredService<IHostEnvironment>();
