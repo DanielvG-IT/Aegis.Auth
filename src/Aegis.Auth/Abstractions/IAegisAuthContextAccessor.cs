@@ -4,5 +4,5 @@ namespace Aegis.Auth.Abstractions;
 
 public interface IAegisAuthContextAccessor
 {
-  Task<AegisAuthContext?> GetCurrentAsync(HttpContext httpContext, CancellationToken cancellationToken = default);
+    Task<AegisAuthContext?> GetCurrentAsync(HttpContext httpContext, CancellationToken cancellationToken = default);
 }
