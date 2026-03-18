@@ -1,7 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
 using Aegis.Auth.Abstractions;
-using Aegis.Auth.Entities;
 using Aegis.Auth.Extensions;
 using Aegis.Auth.Sample.Data;
 using Aegis.Auth.Sample.Services;
