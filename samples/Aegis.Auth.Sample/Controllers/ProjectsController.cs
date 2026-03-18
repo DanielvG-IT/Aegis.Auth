@@ -22,7 +22,7 @@ public sealed class ProjectsController(SampleAuthDbContext context, IProjectWork
     [HttpGet("my")]
     public async Task<IActionResult> GetMyProjects(CancellationToken cancellationToken)
     {
-        string userId = GetRequiredUserId();
+        var userId = GetRequiredUserId();
 
         UserTierProfile? tierProfile = await _workspaceService.GetTierProfileAsync(userId, cancellationToken);
         if (tierProfile is null)
@@ -49,7 +49,7 @@ public sealed class ProjectsController(SampleAuthDbContext context, IProjectWork
     [HttpGet("my/workspace")]
     public async Task<IActionResult> GetMyWorkspace(CancellationToken cancellationToken)
     {
-        string userId = GetRequiredUserId();
+        var userId = GetRequiredUserId();
 
         UserTierProfile? tierProfile = await _workspaceService.GetTierProfileAsync(userId, cancellationToken);
         if (tierProfile is null)
@@ -85,7 +85,7 @@ public sealed class ProjectsController(SampleAuthDbContext context, IProjectWork
     [HttpPost]
     public async Task<IActionResult> CreateProject([FromBody] CreateProjectRequest request, CancellationToken cancellationToken)
     {
-        string userId = GetRequiredUserId();
+        var userId = GetRequiredUserId();
 
         if (string.IsNullOrWhiteSpace(request.Name))
         {
@@ -119,7 +119,7 @@ public sealed class ProjectsController(SampleAuthDbContext context, IProjectWork
     [HttpGet("{projectId}/tasks")]
     public async Task<IActionResult> GetProjectTasks(string projectId, CancellationToken cancellationToken)
     {
-        string userId = GetRequiredUserId();
+        var userId = GetRequiredUserId();
 
         ProjectTasksDto? project = await _workspaceService.GetProjectTasksAsync(userId, projectId, cancellationToken);
 
@@ -134,7 +134,7 @@ public sealed class ProjectsController(SampleAuthDbContext context, IProjectWork
     [HttpPost("{projectId}/tasks")]
     public async Task<IActionResult> AddTask(string projectId, [FromBody] AddTaskRequest request, CancellationToken cancellationToken)
     {
-        string userId = GetRequiredUserId();
+        var userId = GetRequiredUserId();
 
         if (string.IsNullOrWhiteSpace(request.Title))
         {

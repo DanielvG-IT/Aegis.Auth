@@ -17,7 +17,7 @@ internal sealed class AegisAuthContextAccessor(SessionCookieHandler cookieHandle
     {
         ArgumentNullException.ThrowIfNull(httpContext);
 
-        string? sessionToken = _cookieHandler.GetSessionToken(httpContext);
+        var sessionToken = _cookieHandler.GetSessionToken(httpContext);
         if (string.IsNullOrWhiteSpace(sessionToken))
         {
             return null;
