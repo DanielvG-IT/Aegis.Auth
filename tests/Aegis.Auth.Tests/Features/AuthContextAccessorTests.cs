@@ -3,6 +3,7 @@ using Aegis.Auth.Core.Crypto;
 using Aegis.Auth.Entities;
 using Aegis.Auth.Infrastructure.Auth;
 using Aegis.Auth.Infrastructure.Cookies;
+using Aegis.Auth.Options;
 using Aegis.Auth.Tests.Helpers;
 
 using Microsoft.AspNetCore.Http;
@@ -77,6 +78,35 @@ public sealed class AuthContextAccessorTests : IDisposable
         Assert.Null(context);
     }
 
+    [Fact]
+    public async Task GetCurrentAsync_ValidCookieCache_ReturnsAuthContextFromCookieCache()
+    {
+        using var fixture = new ServiceTestFixture(options =>
+        {
+            options.Session.CookieCache = new CookieCacheOptions
+            {
+                Enabled = true,
+                MaxAge = 300,
+            };
+        });
+
+        var cookieHandler = new SessionCookieHandler(fixture.Options, isDevelopment: true);
+        IAegisAuthContextAccessor sut = new AegisAuthContextAccessor(cookieHandler, fixture.DbContext);
+
+        (User user, _) = await fixture.SeedUserAsync();
+        Session session = await SeedSessionAsync(fixture, user, token: "cached-token");
+
+        DefaultHttpContext httpContext = CreateHttpContextWithSessionCookies(cookieHandler, session, user);
+
+        AegisAuthContext? context = await sut.GetCurrentAsync(httpContext);
+
+        Assert.NotNull(context);
+        Assert.Equal(user.Id, context!.UserId);
+        Assert.Equal(session.Token, context.SessionToken);
+        Assert.Equal(session.ExpiresAt, context.ExpiresAt);
+        Assert.True(context.IsFromCookieCache);
+    }
+
     private DefaultHttpContext CreateHttpContextWithSessionCookie(string token)
     {
         var signedToken = AegisSigner.Sign(token, _fixture.Options.Secret);
@@ -86,7 +116,27 @@ public sealed class AuthContextAccessorTests : IDisposable
         return httpContext;
     }
 
-    private async Task<Session> SeedSessionAsync(User user, string token, DateTime? expiresAt = null)
+    private static DefaultHttpContext CreateHttpContextWithSessionCookies(SessionCookieHandler cookieHandler, Session session, User user)
+    {
+        var responseContext = new DefaultHttpContext();
+        cookieHandler.SetSessionCookie(responseContext, session, user, rememberMe: true);
+
+        var requestCookies = responseContext.Response.Headers.SetCookie
+            .Select(static cookie => (cookie ?? string.Empty).Split(';', 2)[0])
+            .Where(static cookie => string.IsNullOrWhiteSpace(cookie) is false)
+            .ToArray();
+
+        var cookieHeader = string.Join("; ", requestCookies);
+
+        var requestContext = new DefaultHttpContext();
+        requestContext.Request.Headers.Cookie = cookieHeader;
+        return requestContext;
+    }
+
+    private Task<Session> SeedSessionAsync(User user, string token, DateTime? expiresAt = null)
+        => SeedSessionAsync(_fixture, user, token, expiresAt);
+
+    private static async Task<Session> SeedSessionAsync(ServiceTestFixture fixture, User user, string token, DateTime? expiresAt = null)
     {
         var session = new Session
         {
@@ -101,8 +151,8 @@ public sealed class AuthContextAccessorTests : IDisposable
             UpdatedAt = DateTime.UtcNow,
         };
 
-        _fixture.DbContext.Sessions.Add(session);
-        await _fixture.DbContext.SaveChangesAsync();
+        fixture.DbContext.Sessions.Add(session);
+        await fixture.DbContext.SaveChangesAsync();
         return session;
     }
 }
