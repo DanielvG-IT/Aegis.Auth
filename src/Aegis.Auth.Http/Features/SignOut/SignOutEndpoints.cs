@@ -34,7 +34,7 @@ internal static class SignOutEndpoints
             return Results.Ok(new SignOutResponse { Success = true });
         }
 
-        var result = await signOutService.SignOut(new SignOutInput { Token = token }, cancellationToken);
+        Result result = await signOutService.SignOut(new SignOutInput { Token = token }, cancellationToken);
         if (result.IsSuccess is false)
         {
             return AegisHttpResultMapper.MapError(httpContext, result.ErrorCode, result.Message);

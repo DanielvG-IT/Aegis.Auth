@@ -11,6 +11,8 @@ This is a sample ASP.NET Core Web API project that demonstrates how to use the A
 - ✅ Business domain example (`Projects` + `ProjectTasks`) tied to authenticated user
 - ✅ SQLite database for realistic local persistence
 - ✅ Strongly typed app-specific user extension (`AppUser.IsSpecial`)
+- ✅ Controller protection example via `[AegisAuthorize]`
+- ✅ Minimal API protection example via `.RequireAegisAuth()`
 - ✅ Pre-seeded test user
 
 ## Test Credentials
@@ -80,7 +82,8 @@ Content-Type: application/json
 GET /api/projects/my
 ```
 
-Returns projects owned by the currently authenticated user (resolved from Aegis session cookie).
+Returns projects owned by the currently authenticated user.
+This controller is protected by `[AegisAuthorize]` and reads `HttpContext.GetAegisAuthContext()`.
 
 ```http
 GET /api/projects/my/workspace
@@ -110,6 +113,14 @@ Content-Type: application/json
   "title": "Ship first public beta"
 }
 ```
+
+### Custom Minimal API Behind Authentication
+
+```http
+GET /api/demo/me
+```
+
+Demonstrates user-defined minimal APIs protected with `.RequireAegisAuth()`.
 
 ## Testing with curl
 
@@ -168,7 +179,10 @@ curl http://localhost:5000/api/projects/my -b cookies.txt
 # 3) Read tier/limits for the current user
 curl http://localhost:5000/api/projects/my/workspace -b cookies.txt
 
-# 4) Create a project
+# 4) Read current auth context through a protected minimal API
+curl http://localhost:5000/api/demo/me -b cookies.txt
+
+# 5) Create a project
 curl -X POST http://localhost:5000/api/projects \
   -H "Content-Type: application/json" \
   -d '{"name":"Aegis Demo","description":"Show auth-powered business behavior"}' \
@@ -210,7 +224,11 @@ This lets you remove routes entirely (for example, no sign-up endpoint in produc
 - **Program.cs**: Application configuration and startup
 - **Aegis.Auth.Http**: Package that maps auth endpoints via `app.MapAegisAuthEndpoints()`
 
-The authentication endpoints are minimal APIs in `Aegis.Auth.Http` (not MVC controllers in the sample project).
+The authentication endpoints are minimal APIs in `Aegis.Auth.Http`.
+The sample also demonstrates protecting user-defined routes in both styles:
+
+- Controller style: `[AegisAuthorize]` + `HttpContext.GetAegisAuthContext()`
+- Minimal API style: `.RequireAegisAuth()`
 
 ## Extending User Properties
 

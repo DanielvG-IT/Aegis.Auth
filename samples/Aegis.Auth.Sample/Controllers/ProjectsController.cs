@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 
-using Aegis.Auth.Infrastructure.Cookies;
+using Aegis.Auth.Abstractions;
+using Aegis.Auth.Extensions;
 using Aegis.Auth.Sample.Data;
 using Aegis.Auth.Sample.Services;
 
@@ -11,28 +12,24 @@ namespace Aegis.Auth.Sample.Controllers;
 
 [ApiController]
 [Route("api/projects")]
-public sealed class ProjectsController(SampleAuthDbContext context, SessionCookieHandler cookieHandler, IProjectWorkspaceService workspaceService) : ControllerBase
+[AegisAuthorize]
+public sealed class ProjectsController(SampleAuthDbContext context, IProjectWorkspaceService workspaceService) : ControllerBase
 {
     private readonly SampleAuthDbContext _context = context;
-    private readonly SessionCookieHandler _cookieHandler = cookieHandler;
     private readonly IProjectWorkspaceService _workspaceService = workspaceService;
 
     [HttpGet("my")]
     public async Task<IActionResult> GetMyProjects(CancellationToken cancellationToken)
     {
-        var userId = await ResolveUserIdAsync(cancellationToken);
-        if (userId is null)
-        {
-            return Unauthorized(new { message = "Sign in first to access your projects." });
-        }
+        var userId = GetRequiredUserId();
 
-        var tierProfile = await _workspaceService.GetTierProfileAsync(userId, cancellationToken);
+        UserTierProfile? tierProfile = await _workspaceService.GetTierProfileAsync(userId, cancellationToken);
         if (tierProfile is null)
         {
             return Unauthorized(new { message = "Authenticated user was not found." });
         }
 
-        var projects = await _workspaceService.GetProjectsForUserAsync(userId, cancellationToken);
+        List<ProjectSummaryDto> projects = await _workspaceService.GetProjectsForUserAsync(userId, cancellationToken);
 
         return Ok(new
         {
@@ -51,13 +48,9 @@ public sealed class ProjectsController(SampleAuthDbContext context, SessionCooki
     [HttpGet("my/workspace")]
     public async Task<IActionResult> GetMyWorkspace(CancellationToken cancellationToken)
     {
-        var userId = await ResolveUserIdAsync(cancellationToken);
-        if (userId is null)
-        {
-            return Unauthorized(new { message = "Sign in first to access workspace details." });
-        }
+        var userId = GetRequiredUserId();
 
-        var tierProfile = await _workspaceService.GetTierProfileAsync(userId, cancellationToken);
+        UserTierProfile? tierProfile = await _workspaceService.GetTierProfileAsync(userId, cancellationToken);
         if (tierProfile is null)
         {
             return Unauthorized(new { message = "Authenticated user was not found." });
@@ -91,18 +84,14 @@ public sealed class ProjectsController(SampleAuthDbContext context, SessionCooki
     [HttpPost]
     public async Task<IActionResult> CreateProject([FromBody] CreateProjectRequest request, CancellationToken cancellationToken)
     {
-        var userId = await ResolveUserIdAsync(cancellationToken);
-        if (userId is null)
-        {
-            return Unauthorized(new { message = "Sign in first to create projects." });
-        }
+        var userId = GetRequiredUserId();
 
         if (string.IsNullOrWhiteSpace(request.Name))
         {
             return BadRequest(new { message = "Project name is required." });
         }
 
-        var createdProject = await _workspaceService.CreateProjectAsync(
+        CreateProjectResult? createdProject = await _workspaceService.CreateProjectAsync(
             userId,
             request.Name,
             request.Description,
@@ -129,13 +118,9 @@ public sealed class ProjectsController(SampleAuthDbContext context, SessionCooki
     [HttpGet("{projectId}/tasks")]
     public async Task<IActionResult> GetProjectTasks(string projectId, CancellationToken cancellationToken)
     {
-        var userId = await ResolveUserIdAsync(cancellationToken);
-        if (userId is null)
-        {
-            return Unauthorized(new { message = "Sign in first to access project tasks." });
-        }
+        var userId = GetRequiredUserId();
 
-        var project = await _workspaceService.GetProjectTasksAsync(userId, projectId, cancellationToken);
+        ProjectTasksDto? project = await _workspaceService.GetProjectTasksAsync(userId, projectId, cancellationToken);
 
         if (project is null)
         {
@@ -148,18 +133,14 @@ public sealed class ProjectsController(SampleAuthDbContext context, SessionCooki
     [HttpPost("{projectId}/tasks")]
     public async Task<IActionResult> AddTask(string projectId, [FromBody] AddTaskRequest request, CancellationToken cancellationToken)
     {
-        var userId = await ResolveUserIdAsync(cancellationToken);
-        if (userId is null)
-        {
-            return Unauthorized(new { message = "Sign in first to add tasks." });
-        }
+        var userId = GetRequiredUserId();
 
         if (string.IsNullOrWhiteSpace(request.Title))
         {
             return BadRequest(new { message = "Task title is required." });
         }
 
-        var createdTask = await _workspaceService.AddTaskAsync(userId, projectId, request.Title, cancellationToken);
+        AddProjectTaskResult? createdTask = await _workspaceService.AddTaskAsync(userId, projectId, request.Title, cancellationToken);
         if (createdTask is null)
         {
             return BadRequest(new
@@ -179,31 +160,13 @@ public sealed class ProjectsController(SampleAuthDbContext context, SessionCooki
         });
     }
 
-    private async Task<string?> ResolveUserIdAsync(CancellationToken cancellationToken)
+    private string GetRequiredUserId()
     {
-        // Fast path: use verified session_data cookie when present.
-        var userId = _cookieHandler.GetCookieCache(HttpContext)?.User.Id;
-        if (string.IsNullOrWhiteSpace(userId) is false)
-        {
-            return userId;
-        }
+        AegisAuthContext? authContext = HttpContext.GetAegisAuthContext();
+        if (authContext is null || string.IsNullOrWhiteSpace(authContext.UserId))
+            throw new InvalidOperationException("Aegis auth context is unavailable. Ensure [AegisAuthorize] is applied.");
 
-        var token = _cookieHandler.GetSessionToken(HttpContext);
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            return null;
-        }
-
-        var session = await _context.Sessions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Token == token, cancellationToken);
-
-        if (session is null || session.ExpiresAt <= DateTime.UtcNow)
-        {
-            return null;
-        }
-
-        return session.UserId;
+        return authContext.UserId;
     }
 
     public sealed class CreateProjectRequest

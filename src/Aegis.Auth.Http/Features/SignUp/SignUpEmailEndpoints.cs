@@ -40,7 +40,7 @@ internal static class SignUpEmailEndpoints
             IpAddress = httpContext.GetClientIpAddress(),
         };
 
-        var result = await signUpService.SignUpEmail(emailInput, cancellationToken);
+        Result<SignUpResult> result = await signUpService.SignUpEmail(emailInput, cancellationToken);
         if (result.IsSuccess is false || result.Value is null)
         {
             return AegisHttpResultMapper.MapError(httpContext, result.ErrorCode, result.Message);
