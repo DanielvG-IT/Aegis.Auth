@@ -85,6 +85,10 @@
         "description": "Fetch projects for currently signed-in user",
         "endpoint": "GET /api/projects/my"
     },
+    "getDemoMe": {
+        "description": "Custom minimal API endpoint protected by Aegis auth",
+        "endpoint": "GET /api/demo/me"
+    },
     "createProject": {
         "description": "Create a new business project for signed-in user",
         "endpoint": "POST /api/projects",

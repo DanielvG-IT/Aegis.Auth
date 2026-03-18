@@ -3,6 +3,7 @@ using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Features.SignIn;
 using Aegis.Auth.Features.SignOut;
 using Aegis.Auth.Features.SignUp;
+using Aegis.Auth.Infrastructure.Auth;
 using Aegis.Auth.Infrastructure.Cookies;
 using Aegis.Auth.Options;
 
@@ -46,6 +47,7 @@ namespace Aegis.Auth.Extensions
             services.AddScoped<ISignInService, SignInService>();
             services.AddScoped<ISignUpService, SignUpService>();
             services.AddScoped<ISignOutService, SignOutService>();
+            services.AddScoped<IAegisAuthContextAccessor, AegisAuthContextAccessor>();
 
             return services;
         }
