@@ -92,6 +92,21 @@ app.MapAegisAuthEndpoints(options =>
     builder.Configuration.GetSection("AegisHttp").Bind(options);
 });
 
+// Custom minimal APIs protected by Aegis auth.
+app.MapGroup("/api/demo")
+    .RequireAegisAuth()
+    .MapGet("/me", (HttpContext httpContext) =>
+    {
+        var authContext = httpContext.GetAegisAuthContext();
+        return Results.Ok(new
+        {
+            authContext!.UserId,
+            authContext.SessionToken,
+            authContext.ExpiresAt,
+            authContext.IsFromCookieCache,
+        });
+    });
+
 Console.WriteLine("🚀 Aegis Auth Sample API is starting...");
 Console.WriteLine("📝 Test credentials:");
 Console.WriteLine("   Email: test@example.com");

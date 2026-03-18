@@ -147,6 +147,13 @@ Cookie: aegis.session={{sessionCookie}}
 
 ###
 
+### Custom protected minimal API: current auth context
+GET {{baseUrl}}/api/demo/me
+Accept: application/json
+Cookie: aegis.session={{sessionCookie}}
+
+###
+
 ### Business: Create a project (requires auth cookie)
 ### @name createProject
 POST {{baseUrl}}/api/projects

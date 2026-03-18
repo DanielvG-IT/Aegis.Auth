@@ -3,6 +3,7 @@ using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Features.SignIn;
 using Aegis.Auth.Features.SignOut;
 using Aegis.Auth.Features.SignUp;
+using Aegis.Auth.Infrastructure.Auth;
 using Aegis.Auth.Infrastructure.Cookies;
 using Aegis.Auth.Options;
 
@@ -30,7 +31,7 @@ namespace Aegis.Auth.Extensions
             // Backward compatibility for existing consumers resolving AegisAuthOptions directly.
             services.AddSingleton(sp => sp.GetRequiredService<IOptions<AegisAuthOptions>>().Value);
 
-            // Register AegisCookieManager
+            // Register cookie handler
             services.AddScoped(sp =>
             {
                 IHostEnvironment env = sp.GetRequiredService<IHostEnvironment>();
@@ -46,6 +47,7 @@ namespace Aegis.Auth.Extensions
             services.AddScoped<ISignInService, SignInService>();
             services.AddScoped<ISignUpService, SignUpService>();
             services.AddScoped<ISignOutService, SignOutService>();
+            services.AddScoped<IAegisAuthContextAccessor, AegisAuthContextAccessor>();
 
             return services;
         }
