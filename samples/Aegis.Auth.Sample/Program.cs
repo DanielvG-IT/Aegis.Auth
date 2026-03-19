@@ -52,6 +52,30 @@ builder.Services.AddAegisAuth<SampleAuthDbContext>(options =>
         options.OAuth.AddGoogle(googleClientId, googleClientSecret);
     }
 
+    var gitHubClientId = builder.Configuration["AegisAuth:OAuth:GitHub:ClientId"];
+    var gitHubClientSecret = builder.Configuration["AegisAuth:OAuth:GitHub:ClientSecret"];
+    if (string.IsNullOrWhiteSpace(gitHubClientId) is false && string.IsNullOrWhiteSpace(gitHubClientSecret) is false)
+    {
+        options.OAuth.AddGitHub(gitHubClientId, gitHubClientSecret);
+    }
+
+    var microsoftEntraClientId = builder.Configuration["AegisAuth:OAuth:MicrosoftEntra:ClientId"];
+    var microsoftEntraClientSecret = builder.Configuration["AegisAuth:OAuth:MicrosoftEntra:ClientSecret"];
+    if (string.IsNullOrWhiteSpace(microsoftEntraClientId) is false && string.IsNullOrWhiteSpace(microsoftEntraClientSecret) is false)
+    {
+        options.OAuth.AddMicrosoft(microsoftEntraClientId, microsoftEntraClientSecret, entra =>
+        {
+            entra.TenantId = builder.Configuration["AegisAuth:OAuth:MicrosoftEntra:TenantId"] ?? "common";
+        });
+    }
+
+    var appleClientId = builder.Configuration["AegisAuth:OAuth:Apple:ClientId"];
+    var appleClientSecret = builder.Configuration["AegisAuth:OAuth:Apple:ClientSecret"];
+    if (string.IsNullOrWhiteSpace(appleClientId) is false && string.IsNullOrWhiteSpace(appleClientSecret) is false)
+    {
+        options.OAuth.AddApple(appleClientId, appleClientSecret);
+    }
+
     // Configure session
     options.Session.ExpiresIn = 3600; // 1 hour
     options.Session.CookieCache = new CookieCacheOptions

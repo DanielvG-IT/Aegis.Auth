@@ -27,14 +27,14 @@ internal sealed class OAuthService(IOptions<AegisAuthOptions> optionsAccessor, I
             return Result<OAuthSignInResult>.Failure(AuthErrors.System.FeatureDisabled, "OAuth is disabled.");
         }
 
-        if (!string.Equals(input.Identity.ProviderId, "google", StringComparison.OrdinalIgnoreCase))
+        if (!OAuthProviderCatalog.TryGet(input.Identity.ProviderId, out OAuthProviderDefinition? provider))
         {
             return Result<OAuthSignInResult>.Failure(AuthErrors.System.ProviderNotFound, "OAuth provider not found.");
         }
 
-        if (_options.OAuth.Google.Enabled is false)
+        if (provider is null || provider.GetOptions(_options.OAuth).Enabled is false)
         {
-            return Result<OAuthSignInResult>.Failure(AuthErrors.System.FeatureDisabled, "Google OAuth is disabled.");
+            return Result<OAuthSignInResult>.Failure(AuthErrors.System.FeatureDisabled, $"{provider?.DisplayName ?? "Requested"} OAuth is disabled.");
         }
 
         if (string.IsNullOrWhiteSpace(input.Identity.ProviderAccountId))
