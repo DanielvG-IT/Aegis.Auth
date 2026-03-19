@@ -10,9 +10,9 @@ Modular authentication library for .NET, inspired by BetterAuth (TypeScript).
 - Modular architecture (core + HTTP endpoints + optional plugins)
 - Designed for extensibility and clean Program.cs integration
 
-## Google OAuth
+## External OAuth Providers
 
-Google OAuth now uses ASP.NET Core's OAuth middleware for the protocol flow while Aegis still owns account linking and session cookies.
+Aegis now ships provider presets for Google, GitHub, Microsoft, and Apple. The protocol flow runs through ASP.NET Core authentication middleware while Aegis still owns account linking and session cookies.
 
 ```csharp
 builder.Services.AddAegisAuth<AppDbContext>(options =>
@@ -24,6 +24,19 @@ builder.Services.AddAegisAuth<AppDbContext>(options =>
   options.OAuth.AddGoogle(
     clientId: builder.Configuration["AegisAuth:OAuth:Google:ClientId"]!,
     clientSecret: builder.Configuration["AegisAuth:OAuth:Google:ClientSecret"]!);
+
+  options.OAuth.AddGitHub(
+    clientId: builder.Configuration["AegisAuth:OAuth:GitHub:ClientId"]!,
+    clientSecret: builder.Configuration["AegisAuth:OAuth:GitHub:ClientSecret"]!);
+
+  options.OAuth.AddMicrosoftEntra(
+    clientId: builder.Configuration["AegisAuth:OAuth:MicrosoftEntra:ClientId"]!,
+    clientSecret: builder.Configuration["AegisAuth:OAuth:MicrosoftEntra:ClientSecret"]!,
+    configure: entra => entra.TenantId = "common");
+
+  options.OAuth.AddApple(
+    clientId: builder.Configuration["AegisAuth:OAuth:Apple:ClientId"]!,
+    clientSecret: builder.Configuration["AegisAuth:OAuth:Apple:ClientSecret"]!);
 });
 ```
 
@@ -33,16 +46,49 @@ If you prefer property configuration:
 options.OAuth.Google.Enabled = true;
 options.OAuth.Google.ClientId = "...";
 options.OAuth.Google.ClientSecret = "...";
+
+options.OAuth.GitHub.Enabled = true;
+options.OAuth.GitHub.ClientId = "...";
+options.OAuth.GitHub.ClientSecret = "...";
+
+options.OAuth.MicrosoftEntra.Enabled = true;
+options.OAuth.MicrosoftEntra.ClientId = "...";
+options.OAuth.MicrosoftEntra.ClientSecret = "...";
+options.OAuth.MicrosoftEntra.TenantId = "common";
+
+options.OAuth.Apple.Enabled = true;
+options.OAuth.Apple.ClientId = "...";
+options.OAuth.Apple.ClientSecret = "..."; // pre-generated Apple client secret JWT
 ```
 
-For OAuth apps, remember to add:
+Provider start routes are:
+
+```text
+/api/auth/sign-in/oauth/google
+/api/auth/sign-in/oauth/github
+/api/auth/sign-in/oauth/microsoft
+/api/auth/sign-in/oauth/apple
+```
+
+For external auth providers, remember to add:
 
 ```csharp
 app.UseAuthentication();
 app.UseAuthorization();
 ```
 
-The Google Console redirect URI should match `AegisAuthOptions.OAuth.Google.CallbackPath`.
+Each provider console should use its matching callback path:
+
+- `AegisAuthOptions.OAuth.Google.CallbackPath`
+- `AegisAuthOptions.OAuth.GitHub.CallbackPath`
+- `AegisAuthOptions.OAuth.MicrosoftEntra.CallbackPath`
+- `AegisAuthOptions.OAuth.Apple.CallbackPath`
+
+Notes:
+
+- GitHub is included because it is a common consumer ask, even though its web sign-in flow is OAuth 2.0 rather than OIDC.
+- Microsoft Entra defaults to `TenantId = "common"` so consumers can tighten that to `organizations`, `consumers`, or a specific tenant.
+- Apple requires a pre-generated client secret JWT and defaults to `response_mode=form_post`.
 
 ## Getting Started
 

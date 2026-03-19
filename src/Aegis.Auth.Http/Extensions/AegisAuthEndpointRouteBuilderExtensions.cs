@@ -49,14 +49,14 @@ public static class AegisAuthEndpointRouteBuilderExtensions
         var canMapOAuth = mapOptions.MapOAuthSignIn;
         if (canMapOAuth)
         {
-            if (mapOptions.RespectConfiguration && (authOptions.OAuth.Enabled is false || authOptions.OAuth.Google.Enabled is false))
+            if (mapOptions.RespectConfiguration && (authOptions.OAuth.Enabled is false || Aegis.Auth.Features.OAuth.OAuthProviderCatalog.HasEnabledProviders(authOptions.OAuth) is false))
             {
                 canMapOAuth = false;
             }
 
             if (canMapOAuth)
             {
-                group.MapGoogleOAuth();
+                group.MapOAuth();
             }
         }
 

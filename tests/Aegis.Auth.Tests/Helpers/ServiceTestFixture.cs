@@ -105,7 +105,7 @@ internal sealed class ServiceTestFixture : IDisposable
     /// <summary>
     /// Seeds a user with NO credential account (simulates OAuth-only user).
     /// </summary>
-    public async Task<User> SeedOAuthOnlyUserAsync(string email = "oauth@test.com")
+    public async Task<User> SeedOAuthOnlyUserAsync(string email = "oauth@test.com", string providerId = "google")
     {
         DateTime now = DateTime.UtcNow;
         var user = new User
@@ -122,7 +122,7 @@ internal sealed class ServiceTestFixture : IDisposable
             Id = Guid.CreateVersion7().ToString(),
             AccountId = email,
             UserId = user.Id,
-            ProviderId = "google", // OAuth, not "credential"
+            ProviderId = providerId, // OAuth, not "credential"
             CreatedAt = now,
             UpdatedAt = now,
         };

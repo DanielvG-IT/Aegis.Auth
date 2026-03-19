@@ -1,6 +1,3 @@
-using System.Globalization;
-using System.Security.Claims;
-
 using Aegis.Auth.Constants;
 using Aegis.Auth.Extensions;
 using Aegis.Auth.Features.OAuth;
@@ -19,29 +16,30 @@ namespace Aegis.Auth.Http.Features.SignIn;
 
 internal static class SignInOAuthEndpoints
 {
-    public static RouteGroupBuilder MapGoogleOAuth(this RouteGroupBuilder group)
+    public static RouteGroupBuilder MapOAuth(this RouteGroupBuilder group)
     {
-        group.MapGet("/sign-in/oauth/google", StartGoogleOAuthAsync)
-            .WithName("AegisAuth.SignIn.Google")
-            .WithSummary("Start Google OAuth sign-in");
+        group.MapGet("/sign-in/oauth/{provider}", StartOAuthAsync)
+            .WithName("AegisAuth.SignIn.OAuth")
+            .WithSummary("Start external OAuth sign-in");
 
-        group.MapGet("/sign-in/oauth/google/callback", CompleteGoogleOAuthAsync)
-            .WithName("AegisAuth.SignIn.Google.Callback")
-            .WithSummary("Complete Google OAuth sign-in");
+        group.MapGet("/sign-in/oauth/{provider}/callback", CompleteOAuthAsync)
+            .WithName("AegisAuth.SignIn.OAuth.Callback")
+            .WithSummary("Complete external OAuth sign-in");
 
         return group;
     }
 
-    private static IResult StartGoogleOAuthAsync(
+    private static IResult StartOAuthAsync(
         HttpContext httpContext,
         IOptions<AegisAuthOptions> optionsAccessor,
+        string provider,
         [AsParameters] OAuthChallengeRequest request)
     {
         AegisAuthOptions options = optionsAccessor.Value;
 
-        if (options.OAuth.Enabled is false || options.OAuth.Google.Enabled is false)
+        if (!TryResolveEnabledProvider(httpContext, options, provider, out OAuthProviderDefinition? providerDefinition, out IResult? errorResult))
         {
-            return AegisHttpResultMapper.MapError(httpContext, AuthErrors.System.FeatureDisabled, "Google OAuth is disabled.");
+            return errorResult!;
         }
 
         List<KeyValuePair<string, string?>> query = [];
@@ -66,25 +64,35 @@ internal static class SignInOAuthEndpoints
             RedirectUri = redirectUri
         };
 
-        return Results.Challenge(properties, [AegisAuthSchemes.Google]);
+        return Results.Challenge(properties, [providerDefinition!.Scheme]);
     }
 
-    private static async Task<IResult> CompleteGoogleOAuthAsync(
+    private static async Task<IResult> CompleteOAuthAsync(
         HttpContext httpContext,
         IOAuthService oauthService,
         SessionCookieHandler cookieHandler,
         IOptions<AegisAuthOptions> optionsAccessor,
+        string provider,
         [AsParameters] OAuthChallengeRequest request,
         CancellationToken cancellationToken)
     {
+        AegisAuthOptions options = optionsAccessor.Value;
+        if (!TryResolveEnabledProvider(httpContext, options, provider, out OAuthProviderDefinition? providerDefinition, out IResult? errorResult))
+        {
+            return errorResult!;
+        }
+
         AuthenticateResult authResult = await httpContext.AuthenticateAsync(AegisAuthSchemes.ExternalCookie);
         if (!authResult.Succeeded || authResult.Principal is null)
         {
             await httpContext.SignOutAsync(AegisAuthSchemes.ExternalCookie);
-            return AegisHttpResultMapper.MapError(httpContext, AuthErrors.Identity.InvalidCredentials, "Google authentication did not complete successfully.");
+            return AegisHttpResultMapper.MapError(
+                httpContext,
+                AuthErrors.Identity.InvalidCredentials,
+                $"{providerDefinition!.DisplayName} authentication did not complete successfully.");
         }
 
-        ExternalIdentity identity = BuildGoogleIdentity(authResult.Principal, authResult.Properties);
+        ExternalIdentity identity = providerDefinition!.BuildIdentity(authResult.Principal, authResult.Properties);
 
         Result<OAuthSignInResult> result = await oauthService.SignInExternalAsync(
             new OAuthSignInInput
@@ -107,7 +115,7 @@ internal static class SignInOAuthEndpoints
         OAuthSignInResult data = result.Value;
         cookieHandler.SetSessionCookie(httpContext, data.Session, data.User, request.RememberMe);
 
-        var validatedCallback = CallbackValidator.Validate(request.Callback, optionsAccessor.Value);
+        var validatedCallback = CallbackValidator.Validate(request.Callback, options);
         var shouldRedirect = validatedCallback is not null;
         if (shouldRedirect)
         {
@@ -123,38 +131,42 @@ internal static class SignInOAuthEndpoints
         });
     }
 
-    private static ExternalIdentity BuildGoogleIdentity(ClaimsPrincipal principal, AuthenticationProperties? properties)
+    private static bool TryResolveEnabledProvider(
+        HttpContext httpContext,
+        AegisAuthOptions options,
+        string provider,
+        out OAuthProviderDefinition? providerDefinition,
+        out IResult? errorResult)
     {
-        var emailVerified = bool.TryParse(principal.FindFirstValue("urn:google:email_verified"), out var parsedVerified) && parsedVerified;
+        errorResult = null;
 
-        return new ExternalIdentity
+        if (options.OAuth.Enabled is false)
         {
-            ProviderId = "google",
-            ProviderAccountId = principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty,
-            Email = principal.FindFirstValue(ClaimTypes.Email),
-            EmailVerified = emailVerified,
-            Name = principal.FindFirstValue(ClaimTypes.Name),
-            Image = principal.FindFirstValue("urn:google:picture"),
-            AccessToken = properties?.GetTokenValue("access_token"),
-            RefreshToken = properties?.GetTokenValue("refresh_token"),
-            AccessTokenExpiresAt = ParseTokenDate(properties?.GetTokenValue("expires_at")),
-            Scope = properties?.GetTokenValue("scope"),
-            IdToken = properties?.GetTokenValue("id_token"),
-        };
-    }
-
-    private static DateTime? ParseTokenDate(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
+            providerDefinition = null;
+            errorResult = AegisHttpResultMapper.MapError(httpContext, AuthErrors.System.FeatureDisabled, "OAuth is disabled.");
+            return false;
         }
 
-        return DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal, out var parsed)
-            ? parsed
-            : null;
-    }
+        if (!OAuthProviderCatalog.TryGet(provider, out providerDefinition))
+        {
+            errorResult = AegisHttpResultMapper.MapError(
+                httpContext,
+                AuthErrors.System.ProviderNotFound,
+                $"OAuth provider '{provider}' is not supported.");
+            return false;
+        }
 
+        if (providerDefinition is null || providerDefinition.GetOptions(options.OAuth).Enabled is false)
+        {
+            errorResult = AegisHttpResultMapper.MapError(
+                httpContext,
+                AuthErrors.System.FeatureDisabled,
+                $"{providerDefinition?.DisplayName ?? "Requested"} OAuth is disabled.");
+            return false;
+        }
+
+        return true;
+    }
     internal sealed class OAuthChallengeRequest
     {
         public string? Callback { get; init; }
