@@ -47,7 +47,7 @@ public sealed class OAuthServiceTests : IDisposable
     public async Task SignInExternalAsync_WhenAccountExists_CreatesSessionAndUpdatesTokens()
     {
         var user = await _fixture.SeedOAuthOnlyUserAsync("oauth-existing@test.com");
-        var account = _fixture.DbContext.Accounts.Single(a => a.UserId == user.Id && a.ProviderId == "google");
+        var account = _fixture.DbContext.Accounts.Single(a => a.UserId == user.Id && a.ProviderId == AegisAuthProviders.Google);
         account.AccountId = "google-sub-1";
         await _fixture.DbContext.SaveChangesAsync();
 
@@ -70,7 +70,7 @@ public sealed class OAuthServiceTests : IDisposable
         Assert.True(result.IsSuccess);
         Assert.True(result.Value!.CreatedUser);
         Assert.Equal("new-google@test.com", result.Value.User.Email);
-        Assert.Equal("google", result.Value.Account.ProviderId);
+        Assert.Equal(AegisAuthProviders.Google, result.Value.Account.ProviderId);
     }
 
     [Fact]
@@ -85,7 +85,7 @@ public sealed class OAuthServiceTests : IDisposable
         Assert.True(result.IsSuccess);
         Assert.True(result.Value!.LinkedByEmail);
         Assert.Equal(user.Id, result.Value.User.Id);
-        Assert.Contains(_fixture.DbContext.Accounts, a => a.UserId == user.Id && a.ProviderId == "google" && a.AccountId == "google-link");
+        Assert.Contains(_fixture.DbContext.Accounts, a => a.UserId == user.Id && a.ProviderId == AegisAuthProviders.Google && a.AccountId == "google-link");
     }
 
     [Fact]
@@ -99,12 +99,50 @@ public sealed class OAuthServiceTests : IDisposable
         Assert.Equal(AuthErrors.Validation.InvalidInput, result.ErrorCode);
     }
 
-    private OAuthSignInInput ValidInput(string providerAccountId = "google-sub-123", string email = "oauth@test.com") =>
+    [Fact]
+    public async Task SignInExternalAsync_WhenProviderNotSupported_ReturnsProviderNotFound()
+    {
+        Result<OAuthSignInResult> result = await _sut.SignInExternalAsync(ValidInput(providerId: "custom-provider"));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.System.ProviderNotFound, result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task SignInExternalAsync_WhenProviderDisabled_ReturnsFeatureDisabled()
+    {
+        Result<OAuthSignInResult> result = await _sut.SignInExternalAsync(
+            ValidInput(providerId: AegisAuthProviders.GitHub, providerAccountId: "github-user-1", email: "octo@test.com"));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.System.FeatureDisabled, result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task SignInExternalAsync_WhenGitHubEnabled_CreatesGitHubAccount()
+    {
+        _fixture.Options.OAuth.GitHub.Enabled = true;
+        _fixture.Options.OAuth.GitHub.ClientId = "github-client-id";
+        _fixture.Options.OAuth.GitHub.ClientSecret = "github-client-secret";
+        SetupSessionMock(userId: null);
+
+        Result<OAuthSignInResult> result = await _sut.SignInExternalAsync(
+            ValidInput(providerId: AegisAuthProviders.GitHub, providerAccountId: "github-user-1", email: "octo@test.com"));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(AegisAuthProviders.GitHub, result.Value!.Account.ProviderId);
+        Assert.Equal("github-user-1", result.Value.Account.AccountId);
+    }
+
+    private OAuthSignInInput ValidInput(
+        string providerId = AegisAuthProviders.Google,
+        string providerAccountId = "google-sub-123",
+        string email = "oauth@test.com") =>
         new()
         {
             Identity = new ExternalIdentity
             {
-                ProviderId = "google",
+                ProviderId = providerId,
                 ProviderAccountId = providerAccountId,
                 Email = email,
                 EmailVerified = true,
