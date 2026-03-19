@@ -22,6 +22,7 @@ namespace Aegis.Auth.Extensions
                 entity.HasKey(e => e.Id);
                 entity.HasIndex(e => e.UserId);
                 entity.HasIndex(e => e.ProviderId);
+                entity.HasIndex(e => new { e.ProviderId, e.AccountId }).IsUnique();
                 entity.HasIndex(e => new { e.UserId, e.ProviderId });
                 entity.HasOne(e => e.User)
                     .WithMany(u => u.Accounts)

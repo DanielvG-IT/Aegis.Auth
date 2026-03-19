@@ -45,6 +45,13 @@ builder.Services.AddAegisAuth<SampleAuthDbContext>(options =>
     // Enable email/password authentication
     options.EmailAndPassword.Enabled = true;
 
+    var googleClientId = builder.Configuration["AegisAuth:OAuth:Google:ClientId"];
+    var googleClientSecret = builder.Configuration["AegisAuth:OAuth:Google:ClientSecret"];
+    if (string.IsNullOrWhiteSpace(googleClientId) is false && string.IsNullOrWhiteSpace(googleClientSecret) is false)
+    {
+        options.OAuth.AddGoogle(googleClientId, googleClientSecret);
+    }
+
     // Configure session
     options.Session.ExpiresIn = 3600; // 1 hour
     options.Session.CookieCache = new CookieCacheOptions
@@ -84,6 +91,7 @@ else
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
@@ -114,4 +122,3 @@ Console.WriteLine("   Password: Password123!");
 Console.WriteLine();
 
 app.Run();
-

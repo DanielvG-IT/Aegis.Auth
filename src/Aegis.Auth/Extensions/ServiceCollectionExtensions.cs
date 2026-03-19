@@ -1,4 +1,9 @@
+using System.Security.Claims;
+using System.Text.Json;
+
 using Aegis.Auth.Abstractions;
+using Aegis.Auth.Constants;
+using Aegis.Auth.Features.OAuth;
 using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Features.SignIn;
 using Aegis.Auth.Features.SignOut;
@@ -7,9 +12,13 @@ using Aegis.Auth.Infrastructure.Auth;
 using Aegis.Auth.Infrastructure.Cookies;
 using Aegis.Auth.Options;
 
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+
+using AspNetOAuthOptions = Microsoft.AspNetCore.Authentication.OAuth.OAuthOptions;
 
 namespace Aegis.Auth.Extensions
 {
@@ -28,6 +37,10 @@ namespace Aegis.Auth.Extensions
                 .Configure(configure ?? (_ => { }))
                 .ValidateOnStart();
 
+            services.AddAuthentication()
+                .AddCookie(AegisAuthSchemes.ExternalCookie)
+                .AddGoogleIfConfigured();
+
             // Backward compatibility for existing consumers resolving AegisAuthOptions directly.
             services.AddSingleton(sp => sp.GetRequiredService<IOptions<AegisAuthOptions>>().Value);
 
@@ -45,6 +58,7 @@ namespace Aegis.Auth.Extensions
             // Add interfaced services
             services.AddScoped<ISessionService, SessionService>();
             services.AddScoped<ISignInService, SignInService>();
+            services.AddScoped<IOAuthService, OAuthService>();
             services.AddScoped<ISignUpService, SignUpService>();
             services.AddScoped<ISignOutService, SignOutService>();
             services.AddScoped<IAegisAuthContextAccessor, AegisAuthContextAccessor>();
@@ -87,6 +101,8 @@ namespace Aegis.Auth.Extensions
                     errors.Add("AegisAuthOptions.EmailAndPassword.MaxPasswordLength must be greater than or equal to MinPasswordLength.");
                 }
 
+                ValidateGoogleOptions(options, errors);
+
                 if (options.Session.ExpiresIn < 0)
                 {
                     errors.Add("AegisAuthOptions.Session.ExpiresIn cannot be negative.");
@@ -111,6 +127,107 @@ namespace Aegis.Auth.Extensions
                 }
 
                 return errors.Count > 0 ? ValidateOptionsResult.Fail(errors) : ValidateOptionsResult.Success;
+            }
+
+            private static void ValidateGoogleOptions(AegisAuthOptions options, List<string> errors)
+            {
+                if (options.OAuth.Enabled is false || options.OAuth.Google.Enabled is false)
+                {
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(options.OAuth.Google.ClientId))
+                {
+                    errors.Add("AegisAuthOptions.OAuth.Google.ClientId must be configured when Google OAuth is enabled.");
+                }
+
+                if (string.IsNullOrWhiteSpace(options.OAuth.Google.ClientSecret))
+                {
+                    errors.Add("AegisAuthOptions.OAuth.Google.ClientSecret must be configured when Google OAuth is enabled.");
+                }
+
+                if (!IsValidRelativePath(options.OAuth.Google.CallbackPath))
+                {
+                    errors.Add("AegisAuthOptions.OAuth.Google.CallbackPath must be an absolute path starting with '/'.");
+                }
+
+            }
+
+            private static bool IsValidRelativePath(string path) =>
+                string.IsNullOrWhiteSpace(path) is false && path.StartsWith('/');
+        }
+
+        private static AuthenticationBuilder AddGoogleIfConfigured(this AuthenticationBuilder authenticationBuilder)
+        {
+            authenticationBuilder.Services.AddSingleton<IConfigureOptions<AspNetOAuthOptions>, GoogleOAuthOptionsSetup>();
+            authenticationBuilder.AddOAuth(AegisAuthSchemes.Google, _ => { });
+            return authenticationBuilder;
+        }
+
+        private sealed class GoogleOAuthOptionsSetup(IOptions<AegisAuthOptions> aegisOptionsAccessor) : IConfigureNamedOptions<AspNetOAuthOptions>
+        {
+            private readonly AegisAuthOptions _aegisOptions = aegisOptionsAccessor.Value;
+
+            public void Configure(AspNetOAuthOptions options) => Configure(Microsoft.Extensions.Options.Options.DefaultName, options);
+
+            public void Configure(string? name, AspNetOAuthOptions options)
+            {
+                if (name != AegisAuthSchemes.Google)
+                {
+                    return;
+                }
+
+                var google = _aegisOptions.OAuth.Google;
+
+                options.SignInScheme = AegisAuthSchemes.ExternalCookie;
+                options.ClientId = google.ClientId;
+                options.ClientSecret = google.ClientSecret;
+                options.CallbackPath = google.CallbackPath;
+                options.AuthorizationEndpoint = "https://accounts.google.com/o/oauth2/v2/auth";
+                options.TokenEndpoint = "https://oauth2.googleapis.com/token";
+                options.UserInformationEndpoint = "https://openidconnect.googleapis.com/v1/userinfo";
+                options.SaveTokens = google.SaveTokens;
+                options.Scope.Clear();
+
+                foreach (var scope in google.Scopes.Where(scope => string.IsNullOrWhiteSpace(scope) is false))
+                {
+                    options.Scope.Add(scope);
+                }
+
+                options.ClaimActions.MapJsonKey(ClaimTypes.NameIdentifier, "sub");
+                options.ClaimActions.MapJsonKey(ClaimTypes.Name, "name");
+                options.ClaimActions.MapJsonKey(ClaimTypes.Email, "email");
+                options.ClaimActions.MapJsonKey("urn:google:picture", "picture");
+                options.ClaimActions.MapJsonKey("urn:google:email_verified", "email_verified");
+
+                options.Events = new OAuthEvents
+                {
+                    OnCreatingTicket = async context =>
+                    {
+                        using var response = await context.Backchannel.GetAsync(context.Options.UserInformationEndpoint, context.HttpContext.RequestAborted);
+                        response.EnsureSuccessStatusCode();
+
+                        await using var payload = await response.Content.ReadAsStreamAsync(context.HttpContext.RequestAborted);
+                        using var document = await JsonDocument.ParseAsync(payload, cancellationToken: context.HttpContext.RequestAborted);
+                        context.RunClaimActions(document.RootElement);
+
+                        if (document.RootElement.TryGetProperty("email_verified", out var emailVerifiedElement))
+                        {
+                            var emailVerified = emailVerifiedElement.ValueKind switch
+                            {
+                                JsonValueKind.True => "true",
+                                JsonValueKind.False => "false",
+                                JsonValueKind.String => emailVerifiedElement.GetString(),
+                                _ => null,
+                            };
+
+                            if (string.IsNullOrWhiteSpace(emailVerified) is false)
+                            {
+                                context.Identity?.AddClaim(new Claim("urn:google:email_verified", emailVerified!));
+                            }
+                        }
+                    }
+                };
             }
         }
     }

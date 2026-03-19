@@ -10,6 +10,40 @@ Modular authentication library for .NET, inspired by BetterAuth (TypeScript).
 - Modular architecture (core + HTTP endpoints + optional plugins)
 - Designed for extensibility and clean Program.cs integration
 
+## Google OAuth
+
+Google OAuth now uses ASP.NET Core's OAuth middleware for the protocol flow while Aegis still owns account linking and session cookies.
+
+```csharp
+builder.Services.AddAegisAuth<AppDbContext>(options =>
+{
+  options.AppName = "MyApp";
+  options.BaseURL = "https://localhost:5001";
+  options.Secret = "replace-with-a-32-char-secret-at-minimum";
+
+  options.OAuth.AddGoogle(
+    clientId: builder.Configuration["AegisAuth:OAuth:Google:ClientId"]!,
+    clientSecret: builder.Configuration["AegisAuth:OAuth:Google:ClientSecret"]!);
+});
+```
+
+If you prefer property configuration:
+
+```csharp
+options.OAuth.Google.Enabled = true;
+options.OAuth.Google.ClientId = "...";
+options.OAuth.Google.ClientSecret = "...";
+```
+
+For OAuth apps, remember to add:
+
+```csharp
+app.UseAuthentication();
+app.UseAuthorization();
+```
+
+The Google Console redirect URI should match `AegisAuthOptions.OAuth.Google.CallbackPath`.
+
 ## Getting Started
 
 Clone the repo:
