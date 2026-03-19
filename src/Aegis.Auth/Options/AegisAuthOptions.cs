@@ -10,6 +10,7 @@ namespace Aegis.Auth.Options
         public ICollection<string>? TrustedOrigins { get; set; }
 
         public EmailAndPasswordOptions EmailAndPassword { get; set; } = new();
+        public OAuthOptions OAuth { get; set; } = new();
 
         // ═══════════════════════════════════════════════════════════════════════════════
         // EMAIL VERIFICATION - DISABLED FOR v0.1, WILL BE RE-ENABLED IN v0.2
