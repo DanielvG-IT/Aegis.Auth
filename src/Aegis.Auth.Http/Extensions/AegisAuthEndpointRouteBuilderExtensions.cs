@@ -20,6 +20,7 @@ public sealed class AegisAuthEndpointMapOptions
     public bool MapSignOut { get; set; } = true;
     public bool MapEmailSignIn { get; set; } = true;
     public bool MapEmailSignUp { get; set; } = true;
+    public bool MapOAuthSignIn { get; set; } = true;
 
     // true: derive defaults from AegisAuthOptions feature flags.
     // false: map strictly by Map* toggles above.
@@ -43,6 +44,20 @@ public static class AegisAuthEndpointRouteBuilderExtensions
         if (mapOptions.MapSignOut)
         {
             group.MapSignOut();
+        }
+
+        var canMapOAuth = mapOptions.MapOAuthSignIn;
+        if (canMapOAuth)
+        {
+            if (mapOptions.RespectConfiguration && (authOptions.OAuth.Enabled is false || authOptions.OAuth.Google.Enabled is false))
+            {
+                canMapOAuth = false;
+            }
+
+            if (canMapOAuth)
+            {
+                group.MapGoogleOAuth();
+            }
         }
 
         var canMapEmail = mapOptions.MapEmailSignIn || mapOptions.MapEmailSignUp;
