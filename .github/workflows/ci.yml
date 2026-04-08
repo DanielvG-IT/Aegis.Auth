@@ -154,29 +154,3 @@ jobs:
 
       - name: Build sample
         run: dotnet build samples/Aegis.Auth.Sample/Aegis.Auth.Sample.csproj -c ${{ env.CONFIGURATION }} -warnaserror
-
-  # ──────────────────────────────────────────────────────────────────────────────
-  # 5. Final gate — aggregates all job statuses for branch protection
-  # ──────────────────────────────────────────────────────────────────────────────
-  ci-passed:
-    name: CI Passed
-    if: always()
-    needs: [quality, build-and-test, pack-validation, sample-app]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Evaluate results
-        run: |
-          echo "Quality:      ${{ needs.quality.result }}"
-          echo "Build & Test: ${{ needs.build-and-test.result }}"
-          echo "Pack:         ${{ needs.pack-validation.result }}"
-          echo "Sample App:   ${{ needs.sample-app.result }}"
-
-          if [[ "${{ needs.quality.result }}" != "success" ]] ||
-             [[ "${{ needs.build-and-test.result }}" != "success" ]] ||
-             [[ "${{ needs.pack-validation.result }}" != "success" ]] ||
-             [[ "${{ needs.sample-app.result }}" != "success" ]]; then
-            echo "::error::One or more CI checks failed."
-            exit 1
-          fi
-
-          echo "✅ All CI checks passed."
