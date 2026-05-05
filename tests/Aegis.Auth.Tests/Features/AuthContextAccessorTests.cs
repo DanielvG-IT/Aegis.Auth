@@ -141,7 +141,8 @@ public sealed class AuthContextAccessorTests : IDisposable
         var session = new Session
         {
             Id = Guid.CreateVersion7().ToString(),
-            Token = token,
+            Token = token,                            // [NotMapped] – kept for assertion convenience
+            TokenHash = AegisCrypto.HashToken(token), // the only value persisted to the DB
             ExpiresAt = expiresAt ?? DateTime.UtcNow.AddDays(7),
             UserId = user.Id,
             User = user,
