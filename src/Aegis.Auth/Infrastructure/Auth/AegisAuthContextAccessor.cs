@@ -1,5 +1,7 @@
 using Aegis.Auth.Abstractions;
+using Aegis.Auth.Core.Crypto;
 using Aegis.Auth.Entities;
+using Aegis.Auth.Extensions;
 using Aegis.Auth.Infrastructure.Cookies;
 using Aegis.Auth.Models;
 
@@ -16,6 +18,12 @@ internal sealed class AegisAuthContextAccessor(SessionCookieHandler cookieHandle
     public async Task<AegisAuthContext?> GetCurrentAsync(HttpContext httpContext, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(httpContext);
+
+        // Short-circuit: auth handler may have already resolved this request.
+        if (httpContext.GetAegisAuthContext() is { } cached)
+        {
+            return cached;
+        }
 
         var sessionToken = _cookieHandler.GetSessionToken(httpContext);
         if (string.IsNullOrWhiteSpace(sessionToken))
@@ -39,9 +47,12 @@ internal sealed class AegisAuthContextAccessor(SessionCookieHandler cookieHandle
             };
         }
 
+        // Hash the raw cookie token before querying the database.
+        // The database only stores the hash; the raw token is never persisted.
+        var tokenHash = AegisCrypto.HashToken(sessionToken);
         Session? session = await _db.Sessions
-        .AsNoTracking()
-        .FirstOrDefaultAsync(s => s.Token == sessionToken, cancellationToken);
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.TokenHash == tokenHash, cancellationToken);
 
         if (session is null || session.ExpiresAt <= DateTime.UtcNow)
         {
@@ -51,7 +62,7 @@ internal sealed class AegisAuthContextAccessor(SessionCookieHandler cookieHandle
         return new AegisAuthContext
         {
             UserId = session.UserId,
-            SessionToken = session.Token,
+            SessionToken = sessionToken, // return the raw cookie token, not the DB hash
             ExpiresAt = session.ExpiresAt,
             IsFromCookieCache = false,
         };
