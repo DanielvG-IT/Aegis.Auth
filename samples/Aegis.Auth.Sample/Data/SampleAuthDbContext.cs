@@ -1,13 +1,14 @@
 using Aegis.Auth.Abstractions;
 using Aegis.Auth.Entities;
 using Aegis.Auth.Extensions;
+using Aegis.Auth.Features.OAuth;
 using Aegis.Auth.Sample.Entities;
 
 using Microsoft.EntityFrameworkCore;
 
 namespace Aegis.Auth.Sample.Data;
 
-public class SampleAuthDbContext(DbContextOptions<SampleAuthDbContext> options) : DbContext(options), IAuthDbContext
+public class SampleAuthDbContext(DbContextOptions<SampleAuthDbContext> options, ITokenEncryptionService tokenEncryption) : DbContext(options), IAuthDbContext
 {
     public DbSet<AppUser> Users { get; set; } = null!;
     public DbSet<Account> Accounts { get; set; } = null!;
@@ -22,7 +23,7 @@ public class SampleAuthDbContext(DbContextOptions<SampleAuthDbContext> options) 
     {
         base.OnModelCreating(modelBuilder);
 
-        modelBuilder.ApplyAegisAuthModel();
+        modelBuilder.ApplyAegisAuthModel(tokenEncryption);
 
         // Add your app-specific entity mappings below.
         // Example: strongly typed extension of Aegis user entity.

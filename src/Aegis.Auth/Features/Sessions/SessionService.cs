@@ -155,7 +155,8 @@ namespace Aegis.Auth.Features.Sessions
         public async Task<Result> RevokeSessionAsync(SessionDeleteInput input, CancellationToken cancellationToken = default)
         {
             var token = input.Token;
-            _logger.SessionRevoking(token);
+            var tokenHash = AegisCrypto.HashToken(token);
+            _logger.SessionRevoking(tokenHash);
 
             // 1. Remove session from cache (immediately de-authenticates for incoming requests)
             if (_cache is not null)
@@ -200,7 +201,6 @@ namespace Aegis.Auth.Features.Sessions
             // 3. Remove from database (record-keeping; user is already functionally signed out)
             if (_options.Session.StoreSessionInDatabase || _cache is null)
             {
-                var tokenHash = AegisCrypto.HashToken(token);
                 Session? dbSession = await _db.Sessions.FirstOrDefaultAsync(s => s.TokenHash == tokenHash && s.UserId == input.User.Id, cancellationToken);
                 if (dbSession is not null)
                 {
@@ -211,13 +211,13 @@ namespace Aegis.Auth.Features.Sessions
                     }
                     catch (Exception ex)
                     {
-                        _logger.SessionRevocationFailed(token, ex);
+                        _logger.SessionRevocationFailed(tokenHash, ex);
                         return Result.Failure(Constants.AuthErrors.System.InternalError, "Failed to revoke session.");
                     }
                 }
             }
 
-            _logger.SessionRevoked(token, input.User.Id);
+            _logger.SessionRevoked(tokenHash, input.User.Id);
             return Result.Success();
         }
 

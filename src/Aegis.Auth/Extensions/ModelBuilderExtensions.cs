@@ -1,4 +1,5 @@
 using Aegis.Auth.Entities;
+using Aegis.Auth.Features.OAuth;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -6,7 +7,7 @@ namespace Aegis.Auth.Extensions
 {
     public static class ModelBuilderExtensions
     {
-        public static ModelBuilder ApplyAegisAuthModel(this ModelBuilder modelBuilder)
+        public static ModelBuilder ApplyAegisAuthModel(this ModelBuilder modelBuilder, ITokenEncryptionService? tokenEncryption = null)
         {
             ArgumentNullException.ThrowIfNull(modelBuilder);
 
@@ -28,6 +29,14 @@ namespace Aegis.Auth.Extensions
                     .WithMany(u => u.Accounts)
                     .HasForeignKey(e => e.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                if (tokenEncryption is not null)
+                {
+                    var converter = new TokenValueConverter(tokenEncryption);
+                    entity.Property(e => e.AccessToken).HasConversion(converter);
+                    entity.Property(e => e.RefreshToken).HasConversion(converter);
+                    entity.Property(e => e.IdToken).HasConversion(converter);
+                }
             });
 
             modelBuilder.Entity<Session>(entity =>
