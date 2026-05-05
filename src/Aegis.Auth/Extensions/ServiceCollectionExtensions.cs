@@ -5,7 +5,11 @@ using System.Text.Json;
 
 using Aegis.Auth.Abstractions;
 using Aegis.Auth.Constants;
+using Aegis.Auth.Features.Csrf;
+using Aegis.Auth.Features.EmailVerification;
 using Aegis.Auth.Features.OAuth;
+using Aegis.Auth.Features.PasswordReset;
+using Aegis.Auth.Features.RateLimit;
 using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Features.SignIn;
 using Aegis.Auth.Features.SignOut;
@@ -24,6 +28,26 @@ using Microsoft.Extensions.Options;
 
 using AspNetOAuthOptions = Microsoft.AspNetCore.Authentication.OAuth.OAuthOptions;
 
+// Public extension point so consumers can call builder.Services.AddAuthentication().AddAegisAuth().
+namespace Aegis.Auth.Extensions
+{
+    public static class AegisAuthSchemeExtensions
+    {
+        /// <summary>
+        /// Registers the Aegis session-cookie authentication handler with the
+        /// ASP.NET Core authentication system. Call this after AddAuthentication().
+        /// </summary>
+        public static AuthenticationBuilder AddAegisAuth(this AuthenticationBuilder builder)
+        {
+            ArgumentNullException.ThrowIfNull(builder);
+            builder.AddScheme<AegisAuthSchemeOptions, AegisAuthenticationHandler>(
+                AegisDefaults.AuthenticationScheme,
+                _ => { });
+            return builder;
+        }
+    }
+}
+
 namespace Aegis.Auth.Extensions
 {
     public static class ServiceCollectionExtensions
@@ -41,9 +65,13 @@ namespace Aegis.Auth.Extensions
                 .Configure(configure ?? (_ => { }))
                 .ValidateOnStart();
 
-            services.AddAuthentication()
+            services.AddAuthentication(AegisDefaults.AuthenticationScheme)
+                .AddAegisAuth()
                 .AddCookie(AegisAuthSchemes.ExternalCookie)
                 .AddExternalOAuthProviders();
+
+            services.AddAuthorization();
+            services.AddDataProtection();
 
             // Backward compatibility for existing consumers resolving AegisAuthOptions directly.
             services.AddSingleton(sp => sp.GetRequiredService<IOptions<AegisAuthOptions>>().Value);
@@ -63,6 +91,11 @@ namespace Aegis.Auth.Extensions
             services.AddScoped<ISignUpService, SignUpService>();
             services.AddScoped<ISignOutService, SignOutService>();
             services.AddScoped<IAegisAuthContextAccessor, AegisAuthContextAccessor>();
+            services.AddScoped<ICsrfTokenService, CsrfTokenService>();
+            services.AddScoped<IEmailVerificationService, EmailVerificationService>();
+            services.AddScoped<IPasswordResetService, PasswordResetService>();
+            services.AddScoped<ITokenEncryptionService, TokenEncryptionService>();
+            services.AddSingleton<IRateLimitService, RateLimitService>();
 
             return services;
         }
@@ -187,9 +220,9 @@ namespace Aegis.Auth.Extensions
         private static AuthenticationBuilder AddExternalOAuthProviders(this AuthenticationBuilder authenticationBuilder)
         {
             authenticationBuilder.Services.AddSingleton<IConfigureOptions<AspNetOAuthOptions>, ExternalOAuthOptionsSetup>();
+            authenticationBuilder.AddOAuth(AegisAuthSchemes.Microsoft, _ => { });
             authenticationBuilder.AddOAuth(AegisAuthSchemes.Google, _ => { });
             authenticationBuilder.AddOAuth(AegisAuthSchemes.GitHub, _ => { });
-            authenticationBuilder.AddOAuth(AegisAuthSchemes.Microsoft, _ => { });
             authenticationBuilder.AddOAuth(AegisAuthSchemes.Apple, _ => { });
             return authenticationBuilder;
         }

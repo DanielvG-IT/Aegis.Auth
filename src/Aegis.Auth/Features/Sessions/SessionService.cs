@@ -2,15 +2,15 @@ using System.Text.Json;
 
 using Aegis.Auth.Abstractions;
 using Aegis.Auth.Core.Crypto;
-using Aegis.Auth.Entities;
 using Aegis.Auth.Extensions;
+using Aegis.Auth.Entities;
 using Aegis.Auth.Logging;
 using Aegis.Auth.Options;
 
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Caching.Distributed;
 
 namespace Aegis.Auth.Features.Sessions
 {
@@ -40,6 +40,7 @@ namespace Aegis.Auth.Features.Sessions
             DateTime now = DateTime.UtcNow;
             var nowUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
+            var rawToken = AegisCrypto.RandomStringGenerator(32, "a-z", "A-Z", "0-9");
             var data = new Session
             {
                 Id = Guid.CreateVersion7().ToString(),
@@ -51,10 +52,10 @@ namespace Aegis.Auth.Features.Sessions
                 // Callers should use input.User if they need the User object, or query by UserId separately.
                 ExpiresAt = input.DontRememberMe ? now.AddDays(1) : now.AddSeconds(sessionExpiration),
                 UserId = input.User.Id,
-                Token = AegisCrypto.RandomStringGenerator(32, "a-z", "A-Z", "0-9"),
+                Token = rawToken,                   // [NotMapped] – transient, used for the cookie
+                TokenHash = AegisCrypto.HashToken(rawToken), // stored in DB; raw token never persisted
                 CreatedAt = now,
                 UpdatedAt = now,
-                // Possible override values later here
             };
 
             // Save to database first if enabled (to ensure consistency before caching)
@@ -199,7 +200,8 @@ namespace Aegis.Auth.Features.Sessions
             // 3. Remove from database (record-keeping; user is already functionally signed out)
             if (_options.Session.StoreSessionInDatabase || _cache is null)
             {
-                Session? dbSession = await _db.Sessions.FirstOrDefaultAsync(s => s.Token == token && s.UserId == input.User.Id, cancellationToken);
+                var tokenHash = AegisCrypto.HashToken(token);
+                Session? dbSession = await _db.Sessions.FirstOrDefaultAsync(s => s.TokenHash == tokenHash && s.UserId == input.User.Id, cancellationToken);
                 if (dbSession is not null)
                 {
                     _db.Sessions.Remove(dbSession);

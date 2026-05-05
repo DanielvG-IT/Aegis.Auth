@@ -1,19 +1,33 @@
-using Aegis.Auth.Abstractions;
-using Aegis.Auth.Extensions;
+using Aegis.Auth.Constants;
 
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
 namespace Aegis.Auth.Http.Extensions;
 
+/// <summary>
+/// Convenience wrappers that protect minimal API endpoints with the Aegis
+/// authentication scheme. These call into the native ASP.NET Core authorization
+/// pipeline, so app.UseAuthentication() and app.UseAuthorization() must be
+/// present in Program.cs.
+///
+/// The AegisAuthenticationHandler runs during UseAuthentication() and:
+///  1. Validates the session cookie.
+///  2. Populates HttpContext.User with the user-id claim.
+///  3. Stores AegisAuthContext in HttpContext.Items for endpoint code that
+///     calls httpContext.GetAegisAuthContext().
+/// </summary>
 public static class AegisAuthProtectionExtensions
 {
     public static RouteGroupBuilder RequireAegisAuth(this RouteGroupBuilder group)
     {
         ArgumentNullException.ThrowIfNull(group);
 
-        group.AddEndpointFilter<AegisAuthRequiredEndpointFilter>();
+        group.RequireAuthorization(new AuthorizeAttribute
+        {
+            AuthenticationSchemes = AegisDefaults.AuthenticationScheme
+        });
         return group;
     }
 
@@ -21,37 +35,10 @@ public static class AegisAuthProtectionExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        builder.AddEndpointFilter<AegisAuthRequiredEndpointFilter>();
-        return builder;
-    }
-
-    private sealed class AegisAuthRequiredEndpointFilter : IEndpointFilter
-    {
-        public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
+        builder.RequireAuthorization(new AuthorizeAttribute
         {
-            if (context.HttpContext.RequestServices.GetService(typeof(IAegisAuthContextAccessor)) is not IAegisAuthContextAccessor accessor)
-            {
-                return Results.Problem(
-                    title: "Server Misconfiguration",
-                    detail: "Aegis auth services are not registered.",
-                    statusCode: StatusCodes.Status500InternalServerError,
-                    type: "https://httpstatuses.com/500",
-                    instance: context.HttpContext.Request.Path);
-            }
-
-            AegisAuthContext? authContext = await accessor.GetCurrentAsync(context.HttpContext, context.HttpContext.RequestAborted);
-            if (authContext is null)
-            {
-                return Results.Problem(
-                    title: "Unauthorized",
-                    detail: "Authentication is required to access this resource.",
-                    statusCode: StatusCodes.Status401Unauthorized,
-                    type: "https://httpstatuses.com/401",
-                    instance: context.HttpContext.Request.Path);
-            }
-
-            context.HttpContext.SetAegisAuthContext(authContext);
-            return await next(context);
-        }
+            AuthenticationSchemes = AegisDefaults.AuthenticationScheme
+        });
+        return builder;
     }
 }
