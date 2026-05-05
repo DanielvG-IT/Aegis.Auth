@@ -17,6 +17,13 @@ internal sealed class PasswordResetService(IAuthDbContext dbContext) : IPassword
         var rawToken = AegisCrypto.RandomStringGenerator(32, "a-z", "A-Z", "0-9");
         var now = DateTime.UtcNow;
 
+        // Invalidate any existing unused reset tokens for this user
+        var existing = await _db.AuthTokens
+            .Where(t => t.UserId == userId && t.Purpose == TokenPurpose && t.ConsumedAt == null)
+            .ToListAsync(ct);
+        foreach (var t in existing)
+            t.ConsumedAt = now;
+
         var authToken = new AuthToken
         {
             Id = Guid.CreateVersion7().ToString(),
@@ -57,17 +64,17 @@ internal sealed class PasswordResetService(IAuthDbContext dbContext) : IPassword
         authToken.ConsumedAt = now;
         _db.AuthTokens.Update(authToken);
 
-        // Update user's password
+        // Update user's credential account password
         var account = await _db.Accounts.FirstOrDefaultAsync(
-            a => a.UserId == userId && a.PasswordHash != null,
+            a => a.UserId == userId && a.ProviderId == "credential",
             ct);
 
-        if (account is not null)
-        {
-            account.PasswordHash = newPasswordHash;
-            account.UpdatedAt = now;
-            _db.Accounts.Update(account);
-        }
+        if (account is null)
+            return false;
+
+        account.PasswordHash = newPasswordHash;
+        account.UpdatedAt = now;
+        _db.Accounts.Update(account);
 
         await _db.SaveChangesAsync(ct);
 
