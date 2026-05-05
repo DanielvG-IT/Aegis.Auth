@@ -118,6 +118,19 @@ internal static class AegisCrypto
             info: HkdfInfo);
     }
 
+    // ── Token hashing ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Produces a SHA-256 hex digest of a raw session token.
+    /// Store this in the database; keep the raw token only in the cookie.
+    /// </summary>
+    public static string HashToken(string rawToken)
+    {
+        var inputBytes = Encoding.UTF8.GetBytes(rawToken);
+        var hashBytes = SHA256.HashData(inputBytes);
+        return Convert.ToHexStringLower(hashBytes);
+    }
+
     // ── RandomStringGenerator ────────────────────────────────────────────────
     private static readonly Dictionary<string, string> Alphabets = new()
         {
