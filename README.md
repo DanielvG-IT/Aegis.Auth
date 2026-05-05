@@ -22,14 +22,14 @@ This is v0.1 — actively developed. The feature set below reflects what is **ac
 - `RequireAegisAuth()` convenience wrapper for minimal APIs
 - Optional distributed cache layer (Redis/memory) on top of PostgreSQL
 - Optional encrypted cookie session data cache
-
-### Planned
-
 - Email verification
 - Password reset
 - CSRF protection
 - Rate limiting / brute-force protection
-- OAuth (Google, Microsoft, GitHub, Apple)
+- OAuth (Google, GitHub, Microsoft, Apple) with account linking
+
+### Planned
+
 - Passkeys
 - TOTP
 - Hooks / events system
