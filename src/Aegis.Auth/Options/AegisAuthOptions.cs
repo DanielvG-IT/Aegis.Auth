@@ -11,6 +11,8 @@ namespace Aegis.Auth.Options
 
         public EmailAndPasswordOptions EmailAndPassword { get; set; } = new();
         public OAuthOptions OAuth { get; set; } = new();
+        public CsrfOptions Csrf { get; set; } = new();
+        public RateLimitOptions RateLimit { get; set; } = new();
 
         // ═══════════════════════════════════════════════════════════════════════════════
         // EMAIL VERIFICATION - DISABLED FOR v0.1, WILL BE RE-ENABLED IN v0.2

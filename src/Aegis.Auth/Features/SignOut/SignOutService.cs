@@ -1,5 +1,6 @@
 using Aegis.Auth.Abstractions;
 using Aegis.Auth.Constants;
+using Aegis.Auth.Core.Crypto;
 using Aegis.Auth.Entities;
 using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Logging;
@@ -24,10 +25,11 @@ namespace Aegis.Auth.Features.SignOut
         {
             _logger.SignOutAttemptInitiated();
 
-            // Look up the session to get the userId for registry cleanup
+            // Hash before querying; the database only stores the hash of the raw token.
+            var tokenHash = AegisCrypto.HashToken(input.Token);
             Session? session = await _db.Sessions
                 .Include(s => s.User)
-                .FirstOrDefaultAsync(s => s.Token == input.Token, cancellationToken);
+                .FirstOrDefaultAsync(s => s.TokenHash == tokenHash, cancellationToken);
 
             if (session is null)
             {
