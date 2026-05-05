@@ -1,4 +1,5 @@
 using Aegis.Auth.Constants;
+using Aegis.Auth.Core.Crypto;
 using Aegis.Auth.Entities;
 using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Features.SignOut;
@@ -162,7 +163,8 @@ public sealed class SignOutServiceTests : IDisposable
             .Callback<SessionDeleteInput, CancellationToken>(async (i, _) =>
             {
                 // Simulate the session being deleted from DB by the service
-                Session? dbSession = await _fixture.DbContext.Sessions.FirstOrDefaultAsync(s => s.Token == i.Token);
+                var hash = AegisCrypto.HashToken(i.Token);
+                Session? dbSession = await _fixture.DbContext.Sessions.FirstOrDefaultAsync(s => s.TokenHash == hash);
                 if (dbSession is not null)
                 {
                     _fixture.DbContext.Sessions.Remove(dbSession);
@@ -225,7 +227,8 @@ public sealed class SignOutServiceTests : IDisposable
         var session = new Session
         {
             Id = Guid.CreateVersion7().ToString(),
-            Token = token,
+            Token = token,                             // [NotMapped] – kept for test convenience
+            TokenHash = AegisCrypto.HashToken(token),  // the only value persisted to the DB
             ExpiresAt = DateTime.UtcNow.AddDays(7),
             UserId = user.Id,
             User = user,

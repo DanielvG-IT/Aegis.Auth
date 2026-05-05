@@ -16,6 +16,7 @@ internal sealed class TestDbContext : DbContext, IAuthDbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<Session> Sessions => Set<Session>();
+    public DbSet<AuthToken> AuthTokens => Set<AuthToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -39,6 +40,14 @@ internal sealed class TestDbContext : DbContext, IAuthDbContext
             e.HasOne(s => s.User)
              .WithMany(u => u.Sessions)
              .HasForeignKey(s => s.UserId);
+        });
+
+        modelBuilder.Entity<AuthToken>(e =>
+        {
+            e.HasKey(a => a.Id);
+            e.HasOne(a => a.User)
+             .WithMany(u => u.AuthTokens)
+             .HasForeignKey(a => a.UserId);
         });
     }
 

@@ -1,5 +1,6 @@
 using System.Text.Json;
 
+using Aegis.Auth.Core.Crypto;
 using Aegis.Auth.Entities;
 using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Tests.Helpers;
@@ -190,7 +191,12 @@ public sealed class SessionServiceTests : IDisposable
         Assert.True(result.IsSuccess);
         Session? dbSession = _fixture.DbContext.Sessions.SingleOrDefault(s => s.Id == result.Value!.Id);
         Assert.NotNull(dbSession);
-        Assert.Equal(result.Value!.Token, dbSession!.Token);
+
+        // The raw token must NEVER appear in the database.
+        Assert.NotEqual(result.Value!.Token, dbSession!.TokenHash);
+
+        // The stored hash must match what we get by hashing the raw token ourselves.
+        Assert.Equal(AegisCrypto.HashToken(result.Value!.Token), dbSession!.TokenHash);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -315,7 +321,7 @@ public sealed class SessionServiceTests : IDisposable
             Token = session.Token,
         });
 
-        Assert.DoesNotContain(_fixture.DbContext.Sessions, s => s.Token == session.Token);
+        Assert.DoesNotContain(_fixture.DbContext.Sessions, s => s.Id == session.Id);
     }
 
     [Fact]
