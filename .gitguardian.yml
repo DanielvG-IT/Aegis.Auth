@@ -1,3 +1,8 @@
 version: 2
 ignore-paths:
   - tests/
+ignored-matches:
+  - name: "Test fixture password (not a real credential)"
+    match: "StrongPass123!"
+  - name: "Public example JWT from jwt.io (not a real token)"
+    match: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"
