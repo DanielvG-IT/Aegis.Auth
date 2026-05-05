@@ -2,170 +2,122 @@
 
 Modular authentication library for .NET, inspired by BetterAuth (TypeScript).
 
-## Features
+## Status
 
-- User management (register, login, sessions)
-- Password, passkeys, TOTP, OAuth support
-- Hooks system (OnUserCreated, OnEmailVerified, etc.)
-- Modular architecture (core + HTTP endpoints + optional plugins)
-- Designed for extensibility and clean Program.cs integration
+This is v0.1 — actively developed. The feature set below reflects what is **actually implemented and tested**, not a target state.
 
-## External OAuth Providers
+### Implemented
 
-Aegis now ships provider presets for Google, GitHub, Microsoft, and Apple. The protocol flow runs through ASP.NET Core authentication middleware while Aegis still owns account linking and session cookies.
+- Email/password sign-up
+- Email/password sign-in
+- Database-backed sessions with HMAC-signed cookies
+- Session token hashing (raw token never stored in the database)
+- Cookie-based authentication (`aegis.session` / `__Host-aegis.session`)
+- Logout / session revocation
+- Revoke all sessions for a user
+- Current user/session lookup via `IAegisAuthContextAccessor`
+- Native ASP.NET Core authentication handler (`AegisAuthenticationHandler`)
+- `HttpContext.User` population with claims
+- `[Authorize]` and `RequireAuthorization()` support
+- `RequireAegisAuth()` convenience wrapper for minimal APIs
+- Optional distributed cache layer (Redis/memory) on top of PostgreSQL
+- Optional encrypted cookie session data cache
 
-```csharp
-builder.Services.AddAegisAuth<AppDbContext>(options =>
-{
-  options.AppName = "MyApp";
-  options.BaseURL = "https://localhost:5001";
-  options.Secret = "replace-with-a-32-char-secret-at-minimum";
+### Planned
 
-  options.OAuth.AddGoogle(
-    clientId: builder.Configuration["AegisAuth:OAuth:Google:ClientId"]!,
-    clientSecret: builder.Configuration["AegisAuth:OAuth:Google:ClientSecret"]!);
-
-  options.OAuth.AddGitHub(
-    clientId: builder.Configuration["AegisAuth:OAuth:GitHub:ClientId"]!,
-    clientSecret: builder.Configuration["AegisAuth:OAuth:GitHub:ClientSecret"]!);
-
-  options.OAuth.AddMicrosoftEntra(
-    clientId: builder.Configuration["AegisAuth:OAuth:MicrosoftEntra:ClientId"]!,
-    clientSecret: builder.Configuration["AegisAuth:OAuth:MicrosoftEntra:ClientSecret"]!,
-    configure: entra => entra.TenantId = "common");
-
-  options.OAuth.AddApple(
-    clientId: builder.Configuration["AegisAuth:OAuth:Apple:ClientId"]!,
-    clientSecret: builder.Configuration["AegisAuth:OAuth:Apple:ClientSecret"]!);
-});
-```
-
-If you prefer property configuration:
-
-```csharp
-options.OAuth.Google.Enabled = true;
-options.OAuth.Google.ClientId = "...";
-options.OAuth.Google.ClientSecret = "...";
-
-options.OAuth.GitHub.Enabled = true;
-options.OAuth.GitHub.ClientId = "...";
-options.OAuth.GitHub.ClientSecret = "...";
-
-options.OAuth.MicrosoftEntra.Enabled = true;
-options.OAuth.MicrosoftEntra.ClientId = "...";
-options.OAuth.MicrosoftEntra.ClientSecret = "...";
-options.OAuth.MicrosoftEntra.TenantId = "common";
-
-options.OAuth.Apple.Enabled = true;
-options.OAuth.Apple.ClientId = "...";
-options.OAuth.Apple.ClientSecret = "..."; // pre-generated Apple client secret JWT
-```
-
-Provider start routes are:
-
-```text
-/api/auth/sign-in/oauth/google
-/api/auth/sign-in/oauth/github
-/api/auth/sign-in/oauth/microsoft
-/api/auth/sign-in/oauth/apple
-```
-
-For external auth providers, remember to add:
-
-```csharp
-app.UseAuthentication();
-app.UseAuthorization();
-```
-
-Each provider console should use its matching callback path:
-
-- `AegisAuthOptions.OAuth.Google.CallbackPath`
-- `AegisAuthOptions.OAuth.GitHub.CallbackPath`
-- `AegisAuthOptions.OAuth.MicrosoftEntra.CallbackPath`
-- `AegisAuthOptions.OAuth.Apple.CallbackPath`
-
-Notes:
-
-- GitHub is included because it is a common consumer ask, even though its web sign-in flow is OAuth 2.0 rather than OIDC.
-- Microsoft Entra defaults to `TenantId = "common"` so consumers can tighten that to `organizations`, `consumers`, or a specific tenant.
-- Apple requires a pre-generated client secret JWT and defaults to `response_mode=form_post`.
+- Email verification
+- Password reset
+- CSRF protection
+- Rate limiting / brute-force protection
+- OAuth (Google, Microsoft, GitHub, Apple)
+- Passkeys
+- TOTP
+- Hooks / events system
+- `Aegis.Auth.EntityFrameworkCore` package split
+- `Aegis.Auth.OAuth.*` provider packages
 
 ## Getting Started
-
-Clone the repo:
 
 ```bash
 git clone https://github.com/DanielvG-IT/Aegis.Auth.git
 cd Aegis.Auth
-```
-
-Open in Visual Studio / Rider / VS Code:
-
-```bash
 dotnet restore
 dotnet build
-
 ```
 
-## Project Structure
+## Minimal setup
 
+```csharp
+// Program.cs
+builder.Services.AddAegisAuth<AppDbContext>(options =>
+{
+    options.AppName = "MyApp";
+    options.BaseURL = "https://localhost:5001";
+    options.Secret = "replace-with-a-32-char-secret-at-minimum";
+
+    options.EmailAndPassword.Enabled = true;
+});
+
+builder.Services.AddAuthorization();
+
+var app = builder.Build();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapAegisAuthEndpoints();
+
+// Protected endpoints
+app.MapGet("/api/me", (HttpContext ctx) =>
+{
+    var auth = ctx.GetAegisAuthContext();
+    return Results.Ok(new { auth!.UserId });
+})
+.RequireAegisAuth();
 ```
-src/
-  Aegis.Auth/
-  Aegis.Auth.Http/
-  Aegis.Auth.Totp/
-  Aegis.Auth.Passkeys/
 
-tests/
-  Aegis.Auth.Tests/
-```
+## Extending the database model
 
-## Contributing
-
-PRs welcome! Please follow the .editorconfig and add tests for new features.
-
-## Extending The Database Model
-
-Library consumers should own their application's DbContext and implement `IAuthDbContext`.
-This lets them use Aegis auth tables plus any app-specific tables in one model.
+Library consumers own their `DbContext` and implement `IAuthDbContext`:
 
 ```csharp
 using Aegis.Auth.Abstractions;
 using Aegis.Auth.Entities;
 using Aegis.Auth.Extensions;
-
 using Microsoft.EntityFrameworkCore;
 
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
-  : DbContext(options), IAuthDbContext
+    : DbContext(options), IAuthDbContext
 {
-  // Required by Aegis.Auth
-  public DbSet<User> Users => Set<User>();
-  public DbSet<Account> Accounts => Set<Account>();
-  public DbSet<Session> Sessions => Set<Session>();
+    public DbSet<User> Users => Set<User>();
+    public DbSet<Account> Accounts => Set<Account>();
+    public DbSet<Session> Sessions => Set<Session>();
 
-  // Your app tables
-  public DbSet<Project> Projects => Set<Project>();
-  public DbSet<ProjectMember> ProjectMembers => Set<ProjectMember>();
+    // App-specific tables
+    public DbSet<Project> Projects => Set<Project>();
 
-  protected override void OnModelCreating(ModelBuilder modelBuilder)
-  {
-    base.OnModelCreating(modelBuilder);
-
-    // Adds Aegis.Auth indexes and relationships
-    modelBuilder.ApplyAegisAuthModel();
-
-    // Configure your app entities
-    modelBuilder.Entity<Project>(entity =>
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-      entity.HasKey(p => p.Id);
-      entity.HasOne<User>()
-        .WithMany()
-        .HasForeignKey(p => p.OwnerUserId)
-        .OnDelete(DeleteBehavior.Restrict);
-    });
-  }
+        base.OnModelCreating(modelBuilder);
+        modelBuilder.ApplyAegisAuthModel();
+    }
 }
 ```
 
-This pattern keeps Aegis isolated while giving app teams full freedom to add business tables, relationships, and migrations.
+## Project structure
+
+```
+src/
+  Aegis.Auth/          — Core: entities, services, crypto, options
+  Aegis.Auth.Http/     — HTTP endpoints, protection extensions
+
+tests/
+  Aegis.Auth.Tests/    — xUnit tests
+
+samples/
+  Aegis.Auth.Sample/
+```
+
+## Contributing
+
+PRs welcome. Follow `.editorconfig` and add tests for new features.
