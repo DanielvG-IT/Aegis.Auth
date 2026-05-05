@@ -42,7 +42,6 @@ namespace Aegis.Auth.Features.SignUp
     public class SignUpResponse
     {
         public required UserDto User { get; init; }
-        public required string? Token { get; init; }
         public required bool Redirect { get; init; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

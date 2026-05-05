@@ -125,7 +125,6 @@ internal static class SignInOAuthEndpoints
         return Results.Ok(new SignInResponse
         {
             User = data.User.ToDto(),
-            Token = data.Session.Token,
             Redirect = false,
             Url = null,
         });

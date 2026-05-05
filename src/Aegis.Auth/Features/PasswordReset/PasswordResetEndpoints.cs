@@ -1,11 +1,13 @@
 using Aegis.Auth.Abstractions;
 using Aegis.Auth.Extensions;
 using Aegis.Auth.Infrastructure.Auth;
+using Aegis.Auth.Options;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Aegis.Auth.Features.PasswordReset;
 
@@ -38,21 +40,22 @@ public static class PasswordResetEndpoints
         var user = await dbContext.Users
             .FirstOrDefaultAsync(u => u.Email == req.Email, ct);
 
-        if (user is null)
-            return Results.Ok(new { message = "If email exists, a reset token has been sent" });
+        // Always return the same response to prevent user enumeration
+        if (user is not null)
+        {
+            var rawToken = await passwordResetService.GenerateResetTokenAsync(user.Id, ct);
+            // TODO: deliver rawToken via email (configure SendPasswordResetEmail delegate in options)
+            _ = rawToken;
+        }
 
-        var rawToken = await passwordResetService.GenerateResetTokenAsync(user.Id, ct);
-
-        // TODO: Send email with rawToken
-        // For now, return token in response for testing; remove in production
-        return Results.Ok(new { token = rawToken });
+        return Results.Ok(new { message = "If an account with that email exists, a reset link has been sent." });
     }
 
     private static async Task<IResult> ResetPasswordAsync(
         ResetPasswordRequest req,
         IPasswordResetService passwordResetService,
         IAegisAuthContextAccessor contextAccessor,
-        IAuthDbContext dbContext,
+        IOptions<AegisAuthOptions> optionsAccessor,
         HttpContext httpContext,
         CancellationToken ct)
     {
@@ -66,8 +69,7 @@ public static class PasswordResetEndpoints
         if (context is null)
             return Results.Unauthorized();
 
-        // Hash the new password
-        var passwordHash = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
+        var passwordHash = await optionsAccessor.Value.EmailAndPassword.Password.Hash(req.NewPassword);
 
         var success = await passwordResetService.ResetPasswordAsync(context.UserId, req.Token, passwordHash, ct);
         if (!success)

@@ -63,7 +63,6 @@ internal static class SignUpEmailEndpoints
         return Results.Ok(new SignUpResponse
         {
             User = data.User.ToDto(),
-            Token = data.Session?.Token,
             Redirect = shouldRedirect,
             Url = validatedCallback,
         });

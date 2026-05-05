@@ -245,20 +245,20 @@ namespace Aegis.Auth.Logging
         [LoggerMessage(
             EventId = 3006,
             Level = LogLevel.Debug,
-            Message = "Revoking session {Token}")]
-        internal static partial void SessionRevoking(this ILogger logger, string token);
+            Message = "Revoking session {TokenHash}")]
+        internal static partial void SessionRevoking(this ILogger logger, string tokenHash);
 
         [LoggerMessage(
             EventId = 3007,
             Level = LogLevel.Information,
-            Message = "Session {Token} revoked successfully for user {UserId}")]
-        internal static partial void SessionRevoked(this ILogger logger, string token, string userId);
+            Message = "Session {TokenHash} revoked successfully for user {UserId}")]
+        internal static partial void SessionRevoked(this ILogger logger, string tokenHash, string userId);
 
         [LoggerMessage(
             EventId = 3008,
             Level = LogLevel.Error,
-            Message = "Failed to revoke session {Token}")]
-        internal static partial void SessionRevocationFailed(this ILogger logger, string token, Exception exception);
+            Message = "Failed to revoke session {TokenHash}")]
+        internal static partial void SessionRevocationFailed(this ILogger logger, string tokenHash, Exception exception);
 
         [LoggerMessage(
             EventId = 3009,
