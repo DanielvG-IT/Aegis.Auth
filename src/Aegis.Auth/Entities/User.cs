@@ -20,5 +20,7 @@ namespace Aegis.Auth.Entities
         public ICollection<Account> Accounts { get; } = [];
         [JsonIgnore]
         public ICollection<Session> Sessions { get; } = [];
+        [JsonIgnore]
+        public ICollection<AuthToken> AuthTokens { get; } = [];
     }
 }
