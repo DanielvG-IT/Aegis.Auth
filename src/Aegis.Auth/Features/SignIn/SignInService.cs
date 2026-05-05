@@ -71,7 +71,7 @@ namespace Aegis.Auth.Features.SignIn
             }
 
             // Already filtered to credential accounts in the Include above
-            Account? credentialAccount = user.Accounts.SingleOrDefault();
+            Account? credentialAccount = user.Accounts.FirstOrDefault();
             if (credentialAccount is null)
             {
                 _logger.SignInNoCredentialAccount(user.Id);

@@ -59,7 +59,6 @@ internal static class SignInEmailEndpoints
         return Results.Ok(new SignInResponse
         {
             User = data.User.ToDto(),
-            Token = data.Session.Token,
             Redirect = shouldRedirect,
             Url = validatedCallback,
         });
