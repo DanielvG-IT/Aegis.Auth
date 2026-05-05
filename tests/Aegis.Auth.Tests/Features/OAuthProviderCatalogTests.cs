@@ -1,7 +1,7 @@
 using System.Security.Claims;
 
-using Aegis.Auth.Features.OAuth;
 using Aegis.Auth.Constants;
+using Aegis.Auth.Features.OAuth;
 using Aegis.Auth.Options;
 
 using Microsoft.AspNetCore.Authentication;
