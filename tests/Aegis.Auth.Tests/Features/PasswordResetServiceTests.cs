@@ -31,7 +31,7 @@ public sealed class PasswordResetServiceTests : IDisposable
     {
         Id = Guid.CreateVersion7().ToString(),
         UserId = userId,
-        ProviderId = "password",
+        ProviderId = "credential",
         AccountId = userId,
         PasswordHash = passwordHash ?? BCrypt.Net.BCrypt.HashPassword("OldPassword123!"),
         CreatedAt = DateTime.UtcNow,
