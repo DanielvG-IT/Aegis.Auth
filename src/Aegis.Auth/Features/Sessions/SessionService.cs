@@ -2,15 +2,15 @@ using System.Text.Json;
 
 using Aegis.Auth.Abstractions;
 using Aegis.Auth.Core.Crypto;
-using Aegis.Auth.Extensions;
 using Aegis.Auth.Entities;
+using Aegis.Auth.Extensions;
 using Aegis.Auth.Logging;
 using Aegis.Auth.Options;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Caching.Distributed;
 
 namespace Aegis.Auth.Features.Sessions
 {
