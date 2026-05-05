@@ -127,6 +127,7 @@ internal static class SignInOAuthEndpoints
             User = data.User.ToDto(),
             Redirect = false,
             Url = null,
+            Token = options.Session.IncludeTokenInResponse ? data.Session.Token : null,
         });
     }
 

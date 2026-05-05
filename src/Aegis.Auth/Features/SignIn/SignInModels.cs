@@ -41,5 +41,12 @@ namespace Aegis.Auth.Features.SignIn
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Url { get; init; }
+
+        /// <summary>
+        /// Only populated when the client sends X-Aegis-Token-Response: true.
+        /// Intended for mobile/API clients that cannot use HttpOnly cookies.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Token { get; init; }
     }
 }

@@ -65,6 +65,7 @@ internal static class SignUpEmailEndpoints
             User = data.User.ToDto(),
             Redirect = shouldRedirect,
             Url = validatedCallback,
+            Token = optionsAccessor.Value.Session.IncludeTokenInResponse ? data.Session?.Token : null,
         });
     }
 }

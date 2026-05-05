@@ -11,6 +11,13 @@ namespace Aegis.Auth.Options
         // public bool PreserveSessionInDatabase { get; set; } = false;
         // public int? FreshAge { get; set; }
         public CookieCacheOptions? CookieCache { get; set; }
+
+        /// <summary>
+        /// When true, the session token is included in JSON sign-in/sign-up responses
+        /// in addition to being set in an HttpOnly cookie. Enable only for deployments
+        /// that serve mobile/API clients unable to use cookies. Defaults to false.
+        /// </summary>
+        public bool IncludeTokenInResponse { get; set; } = false;
     }
 
     public sealed class CookieCacheOptions
