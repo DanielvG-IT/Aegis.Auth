@@ -46,5 +46,8 @@ namespace Aegis.Auth.Features.SignUp
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Url { get; init; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Token { get; init; }
     }
 }
