@@ -58,19 +58,19 @@ public static class CsrfValidationExtensions
     /// Validates CSRF token from the request. Returns true if valid; sets problem detail and returns false if invalid.
     /// Call this in your endpoint handler before processing state-changing operations.
     /// </summary>
-    public static async Task<bool> ValidateCsrfAsync(this HttpContext context, ICsrfTokenService csrfService, IOptions<AegisAuthOptions> optionsAccessor)
+    public static Task<bool> ValidateCsrfAsync(this HttpContext context, ICsrfTokenService csrfService, IOptions<AegisAuthOptions> optionsAccessor)
     {
         var options = optionsAccessor.Value;
 
         if (!options.Csrf.Enabled)
-            return true; // CSRF protection disabled
+            return Task.FromResult(true);
 
         // Get CSRF token from header
         var headerToken = context.Request.Headers[options.Csrf.HeaderName].ToString();
         if (string.IsNullOrWhiteSpace(headerToken))
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
-            return false;
+            return Task.FromResult(false);
         }
 
         // Get CSRF token from cookie
@@ -78,16 +78,16 @@ public static class CsrfValidationExtensions
         if (!context.Request.Cookies.TryGetValue(cookieName, out var cookieToken))
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
-            return false;
+            return Task.FromResult(false);
         }
 
         // Validate
         if (!csrfService.ValidateToken(headerToken, cookieToken))
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
-            return false;
+            return Task.FromResult(false);
         }
 
-        return true;
+        return Task.FromResult(true);
     }
 }

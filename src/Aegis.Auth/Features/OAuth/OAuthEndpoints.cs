@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 
+
 namespace Aegis.Auth.Features.OAuth;
 
 public static class OAuthEndpoints
@@ -35,7 +36,6 @@ public static class OAuthEndpoints
         HttpContext httpContext,
         IOAuthService oauthService,
         SessionCookieHandler cookieHandler,
-        IOptions<AegisAuthOptions> optionsAccessor,
         CancellationToken ct)
     {
         // Get the result of the OAuth authentication
@@ -82,9 +82,7 @@ public static class OAuthEndpoints
         return Results.Redirect(redirectUrl);
     }
 
-    private static async Task<IResult> GetEnabledProvidersAsync(
-        IOAuthService oauthService,
-        IOptions<AegisAuthOptions> optionsAccessor)
+    private static IResult GetEnabledProvidersAsync(IOptions<AegisAuthOptions> optionsAccessor)
     {
         var options = optionsAccessor.Value;
         var enabledProviders = OAuthProviderCatalog.All
