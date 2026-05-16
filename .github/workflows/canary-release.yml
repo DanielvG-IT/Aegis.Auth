@@ -1,124 +1,46 @@
 # ════════════════════════════════════════════════════════════════════════════════
-# Release — Stable NuGet Publish
-# Triggers when a version tag (v*.*.*) is pushed to main.
-# Full validation → pack → publish to NuGet.org → GitHub Release.
-#
-# Workflow:
-#   1. Merge canary → main via PR
-#   2. Tag the merge commit: git tag v0.1.0 && git push --tags
-#   3. This workflow takes over
+# Canary Release — Manual GitHub Pre-release
+# Triggered manually to cut an official canary release.
+# Generates release notes in the style of better-auth: Features / Bug Fixes /
+# Breaking Changes sections, a Contributors list, and a Full changelog link.
 # ════════════════════════════════════════════════════════════════════════════════
-name: Release
+name: Canary Release
 
 on:
-  push:
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"      # v1.0.0
-      - "v[0-9]+.[0-9]+.[0-9]+-?*"    # v1.0.0-rc.1
+  workflow_dispatch:
 
 permissions:
   contents: write
   packages: write
 
 env:
-  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   CONFIGURATION: Release
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  # ──────────────────────────────────────────────────────────────────────────────
-  # 1. Validate — Full build + test + security scan
-  # ──────────────────────────────────────────────────────────────────────────────
-  validate:
-    name: Validate Release
+  release:
+    name: Cut Canary Release
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
 
-      - name: Restore
-        run: dotnet restore
-
-      - name: Security audit
-        run: |
-          dotnet list package --vulnerable --include-transitive 2>&1 | tee audit.txt
-          if grep -qi "has the following vulnerable packages" audit.txt; then
-            echo "::error::Cannot release with vulnerable dependencies!"
-            exit 1
-          fi
-
-      - name: Build
-        run: dotnet build --no-restore -c ${{ env.CONFIGURATION }} -warnaserror
-
-      - name: Test
-        run: >
-          dotnet test --no-build -c ${{ env.CONFIGURATION }}
-          --logger "trx;LogFileName=results.trx"
-          --results-directory ./TestResults
-
-      - name: Build sample app
-        run: dotnet build samples/Aegis.Auth.Sample/Aegis.Auth.Sample.csproj -c ${{ env.CONFIGURATION }}
-
-  # ──────────────────────────────────────────────────────────────────────────────
-  # 2. Publish — Pack and push to NuGet.org + GitHub Release
-  # ──────────────────────────────────────────────────────────────────────────────
-  publish:
-    name: Publish to NuGet
-    needs: validate
-    runs-on: ubuntu-latest
-    # Requires a "nuget" environment in GitHub Settings → Environments.
-    # Configure with an approval gate for production releases.
-    environment: ${{ vars.NUGET_ENVIRONMENT || 'nuget' }}
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: "10.0.x"
-
-      - name: Extract version from tag
+      - name: Calculate canary version
         id: version
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "📦 Release version: ${VERSION}"
-
-          # Detect if this is a pre-release (e.g., v1.0.0-rc.1)
-          if [[ "$VERSION" == *-* ]]; then
-            echo "prerelease=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "prerelease=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Build
-        run: dotnet build -c ${{ env.CONFIGURATION }}
-
-      - name: Pack
-        run: >
-          dotnet pack src/Aegis.Auth/Aegis.Auth.csproj
-          --no-build -c ${{ env.CONFIGURATION }}
-          -o ./artifacts
-          /p:PackageVersion=${{ steps.version.outputs.version }}
-
-      - name: Publish to NuGet.org
-        run: >
-          dotnet nuget push ./artifacts/*.nupkg
-          --source "https://api.nuget.org/v3/index.json"
-          --api-key ${{ secrets.NUGET_API_KEY }}
-          --skip-duplicate
-
-      - name: Publish to GitHub Packages
-        run: >
-          dotnet nuget push ./artifacts/*.nupkg
-          --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
-          --api-key ${{ secrets.GITHUB_TOKEN }}
-          --skip-duplicate
+          TAG=$(git describe --tags --abbrev=0 2>/dev/null) || TAG="v0.1.0"
+          BASE_VERSION=$(echo "$TAG" | sed 's/^v//' | sed 's/-.*$//')
+          CANARY_VERSION="${BASE_VERSION}-canary.${GITHUB_RUN_NUMBER}"
+          echo "version=${CANARY_VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Generate release notes
         id: notes
@@ -129,7 +51,9 @@ jobs:
           import subprocess, json, re, os
 
           new_version = os.environ["NEW_VERSION"]
+          repo = os.environ["GITHUB_REPOSITORY"]
 
+          # Find the last canary release to use as the comparison base
           result = subprocess.run(
               ["gh", "release", "list", "--limit", "10", "--json", "tagName,publishedAt"],
               capture_output=True, text=True
@@ -137,15 +61,16 @@ jobs:
           releases = json.loads(result.stdout.strip() or "[]")
           last_tag, last_date = "", "2020-01-01T00:00:00Z"
           for r in releases:
-              if "-" not in r["tagName"].lstrip("v"):
+              if "canary" in r["tagName"]:
                   last_tag = r["tagName"]
                   last_date = r["publishedAt"]
                   break
 
+          # Fetch merged PRs to canary since the last release
           result = subprocess.run(
               ["gh", "pr", "list",
                "--state", "merged",
-               "--base", "main",
+               "--base", "canary",
                "--json", "title,number,author,labels",
                "--search", f"merged:>={last_date}",
                "--limit", "200"],
@@ -208,10 +133,37 @@ jobs:
               f.write("RELEASE_EOF\n")
           PYTHON
 
-      - name: Create GitHub Release
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore -c ${{ env.CONFIGURATION }}
+
+      - name: Test
+        run: >
+          dotnet test --no-build -c ${{ env.CONFIGURATION }}
+          --logger "trx;LogFileName=results.trx"
+          --results-directory ./TestResults
+
+      - name: Pack
+        run: >
+          dotnet pack src/Aegis.Auth/Aegis.Auth.csproj
+          --no-build -c ${{ env.CONFIGURATION }}
+          -o ./artifacts
+          /p:PackageVersion=${{ steps.version.outputs.version }}
+
+      - name: Publish to GitHub Packages
+        run: >
+          dotnet nuget push ./artifacts/*.nupkg
+          --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+          --api-key ${{ secrets.GITHUB_TOKEN }}
+          --skip-duplicate
+
+      - name: Create GitHub pre-release
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: v${{ steps.version.outputs.version }}
           name: "v${{ steps.version.outputs.version }}"
-          prerelease: ${{ steps.version.outputs.prerelease }}
+          prerelease: true
           files: ./artifacts/*.nupkg
           body: ${{ steps.notes.outputs.body }}
