@@ -35,7 +35,7 @@ jobs:
     name: Validate Release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-dotnet@v5
         with:
@@ -76,7 +76,7 @@ jobs:
     environment: ${{ vars.NUGET_ENVIRONMENT || 'nuget' }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-dotnet@v5
         with:
