@@ -1,4 +1,5 @@
 using Aegis.Auth.Extensions;
+using Aegis.Auth.Features.RateLimit;
 using Aegis.Auth.Features.SignUp;
 using Aegis.Auth.Http.Internal;
 using Aegis.Auth.Infrastructure.Cookies;
@@ -17,7 +18,8 @@ internal static class SignUpEmailEndpoints
     {
         group.MapPost("/sign-up/email", SignUpEmailAsync)
             .WithName("AegisAuth.SignUp.Email")
-            .WithSummary("Sign up with email and password");
+            .WithSummary("Sign up with email and password")
+            .RequireAegisRateLimit("sign-up-email");
 
         return group;
     }

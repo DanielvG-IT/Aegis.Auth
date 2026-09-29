@@ -137,6 +137,16 @@ namespace Aegis.Auth.Extensions
 
                 ValidateOAuthProviderOptions(options, errors);
 
+                if (options.RateLimit.Enabled && options.RateLimit.MaxAttemptsPerIpPerMinute <= 0)
+                {
+                    errors.Add("AegisAuthOptions.RateLimit.MaxAttemptsPerIpPerMinute must be greater than 0 when rate limiting is enabled.");
+                }
+
+                if (options.RateLimit.Enabled && options.RateLimit.MaxAttemptsPerEmailPer15Minutes <= 0)
+                {
+                    errors.Add("AegisAuthOptions.RateLimit.MaxAttemptsPerEmailPer15Minutes must be greater than 0 when rate limiting is enabled.");
+                }
+
                 if (options.Session.ExpiresIn < 0)
                 {
                     errors.Add("AegisAuthOptions.Session.ExpiresIn cannot be negative.");

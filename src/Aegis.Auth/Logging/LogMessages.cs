@@ -126,6 +126,12 @@ namespace Aegis.Auth.Logging
             Message = "SignIn successful for user {UserId}")]
         internal static partial void SignInSuccessful(this ILogger logger, string userId);
 
+        [LoggerMessage(
+            EventId = 1019,
+            Level = LogLevel.Warning,
+            Message = "SignIn blocked: Too many attempts for provided email")]
+        internal static partial void SignInRateLimited(this ILogger logger);
+
         // ═══════════════════════════════════════════════════════════════════════════════
         // Sign Up Messages
         // ═══════════════════════════════════════════════════════════════════════════════
@@ -305,5 +311,15 @@ namespace Aegis.Auth.Logging
             Level = LogLevel.Information,
             Message = "SignOut successful for user {UserId}")]
         internal static partial void SignOutSuccessful(this ILogger logger, string userId);
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // Rate Limit Messages
+        // ═══════════════════════════════════════════════════════════════════════════════
+
+        [LoggerMessage(
+            EventId = 5000,
+            Level = LogLevel.Warning,
+            Message = "Request rejected: Client exceeded the rate limit for {Operation}")]
+        internal static partial void RateLimitExceeded(this ILogger logger, string operation);
     }
 }

@@ -1,6 +1,7 @@
 using Aegis.Auth.Abstractions;
 using Aegis.Auth.Constants;
 using Aegis.Auth.Entities;
+using Aegis.Auth.Features.RateLimit;
 using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Logging;
 using Aegis.Auth.Options;
@@ -18,9 +19,10 @@ namespace Aegis.Auth.Features.SignIn
         Task<Result<SignInResult>> SignInEmail(SignInEmailInput input, CancellationToken cancellationToken = default);
     }
 
-    internal sealed class SignInService(IOptions<AegisAuthOptions> optionsAccessor, ILoggerFactory loggerFactory, IAuthDbContext dbContext, ISessionService sessionService) : ISignInService
+    internal sealed class SignInService(IOptions<AegisAuthOptions> optionsAccessor, ILoggerFactory loggerFactory, IAuthDbContext dbContext, ISessionService sessionService, IRateLimitService rateLimitService) : ISignInService
     {
         private readonly ISessionService _sessionService = sessionService;
+        private readonly IRateLimitService _rateLimitService = rateLimitService;
         private readonly AegisAuthOptions _options = optionsAccessor.Value;
         private readonly IAuthDbContext _db = dbContext;
         private readonly ILogger _logger = loggerFactory.CreateLogger<SignInService>();
@@ -46,6 +48,15 @@ namespace Aegis.Auth.Features.SignIn
             {
                 _logger.SignInInvalidEmailFormat();
                 return Result<SignInResult>.Failure(AuthErrors.Validation.InvalidInput, "Email not valid.");
+            }
+
+            // Every attempt counts, not just failures: consuming the permit up front is atomic, so parallel
+            // requests cannot all slip past the check before a failure is recorded. Checked before the user
+            // lookup so the response is identical for existing and unknown emails.
+            if (_rateLimitService.TryAcquireForEmail(normalizedEmail).IsAllowed is false)
+            {
+                _logger.SignInRateLimited();
+                return Result<SignInResult>.Failure(AuthErrors.RateLimit.TooManyRequests, "Too many sign-in attempts. Please try again later.");
             }
 
             // By hashing passwords for invalid emails, we ensure consistent response times to prevent timing attacks from revealing valid email addresses

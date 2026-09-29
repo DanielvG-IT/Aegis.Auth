@@ -1,5 +1,6 @@
 using Aegis.Auth.Abstractions;
 using Aegis.Auth.Extensions;
+using Aegis.Auth.Features.RateLimit;
 using Aegis.Auth.Infrastructure.Auth;
 using Aegis.Auth.Options;
 
@@ -21,11 +22,13 @@ public static class PasswordResetEndpoints
 
         group.MapPost("/send-token", SendPasswordResetTokenAsync)
             .WithName("SendPasswordResetToken")
-            .WithDescription("Generate and send password reset token");
+            .WithDescription("Generate and send password reset token")
+            .RequireAegisRateLimit("password-reset-send-token");
 
         group.MapPost("/reset", ResetPasswordAsync)
             .WithName("ResetPassword")
-            .WithDescription("Reset password with token");
+            .WithDescription("Reset password with token")
+            .RequireAegisRateLimit("password-reset");
     }
 
     private static async Task<IResult> SendPasswordResetTokenAsync(
