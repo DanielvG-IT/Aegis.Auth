@@ -18,6 +18,11 @@ internal static class SignInOAuthEndpoints
 {
     public static RouteGroupBuilder MapOAuth(this RouteGroupBuilder group)
     {
+        // Literal segment outranks {provider}, so this never reaches StartOAuthAsync.
+        group.MapGet("/sign-in/oauth/providers", GetEnabledProviders)
+            .WithName("AegisAuth.SignIn.OAuth.Providers")
+            .WithSummary("List enabled OAuth providers");
+
         group.MapGet("/sign-in/oauth/{provider}", StartOAuthAsync)
             .WithName("AegisAuth.SignIn.OAuth")
             .WithSummary("Start external OAuth sign-in");
@@ -27,6 +32,20 @@ internal static class SignInOAuthEndpoints
             .WithSummary("Complete external OAuth sign-in");
 
         return group;
+    }
+
+    private static IResult GetEnabledProviders(IOptions<AegisAuthOptions> optionsAccessor)
+    {
+        OAuthOptions oauthOptions = optionsAccessor.Value.OAuth;
+
+        // Same enablement rules as TryResolveEnabledProvider: every listed provider can be started.
+        List<OAuthProviderInfo> providers = oauthOptions.Enabled
+            ? [.. OAuthProviderCatalog.All
+                .Where(provider => provider.GetOptions(oauthOptions).Enabled)
+                .Select(provider => new OAuthProviderInfo { Id = provider.ProviderId, Name = provider.DisplayName })]
+            : [];
+
+        return Results.Ok(new OAuthProvidersResponse { Providers = providers });
     }
 
     private static IResult StartOAuthAsync(
@@ -174,5 +193,16 @@ internal static class SignInOAuthEndpoints
         public bool? RememberMe { get; init; }
 
         internal bool ShouldRemember => RememberMe ?? true;
+    }
+
+    internal sealed class OAuthProvidersResponse
+    {
+        public required IReadOnlyList<OAuthProviderInfo> Providers { get; init; }
+    }
+
+    internal sealed class OAuthProviderInfo
+    {
+        public required string Id { get; init; }
+        public required string Name { get; init; }
     }
 }
