@@ -81,6 +81,15 @@ namespace Aegis.Auth.Features.SignIn
                 return Result<SignInResult>.Failure(AuthErrors.Identity.InvalidEmailOrPassword, "Invalid email or password.");
             }
 
+            AccountLockoutOptions lockout = _options.AccountLockout;
+            if (lockout.Enabled && user.LockoutUntil > DateTime.UtcNow)
+            {
+                _logger.SignInAccountLocked(user.Id);
+                // Hash anyway so a locked account costs the same time as a wrong password.
+                await _options.EmailAndPassword.Password.Hash(input.Password);
+                return Result<SignInResult>.Failure(AuthErrors.Identity.AccountLocked, "Account is locked. Try again later.");
+            }
+
             var currentPassword = credentialAccount.PasswordHash;
             if (string.IsNullOrWhiteSpace(currentPassword))
             {
@@ -94,10 +103,22 @@ namespace Aegis.Auth.Features.SignIn
             if (isValidPassword is false)
             {
                 _logger.SignInInvalidPassword(user.Id);
+                if (lockout.Enabled)
+                {
+                    await RecordFailedSignInAsync(user, lockout, cancellationToken);
+                }
+
                 return Result<SignInResult>.Failure(AuthErrors.Identity.InvalidEmailOrPassword, "Invalid email or password.");
             }
 
             _logger.SignInPasswordVerified(user.Id);
+
+            if (user.FailedSignInCount != 0 || user.LockoutUntil is not null)
+            {
+                user.FailedSignInCount = 0;
+                user.LockoutUntil = null;
+                await _db.SaveChangesAsync(cancellationToken);
+            }
 
             //* ATM User exists, has password and has typed in a valid password!
 
@@ -154,6 +175,20 @@ namespace Aegis.Auth.Features.SignIn
             _logger.SignInSuccessful(user.Id);
 
             return new SignInResult { User = user, Session = session.Value, CallbackUrl = input.Callback };
+        }
+
+        private async Task RecordFailedSignInAsync(User user, AccountLockoutOptions lockout, CancellationToken cancellationToken)
+        {
+            user.FailedSignInCount++;
+            if (user.FailedSignInCount >= lockout.MaxFailedAttempts)
+            {
+                _logger.SignInAccountLockedOut(user.Id, user.FailedSignInCount);
+                user.LockoutUntil = lockout.PermanentLockout ? DateTime.MaxValue : DateTime.UtcNow.Add(lockout.LockoutDuration);
+                // Start fresh once the lock expires, instead of re-locking on the next single failure.
+                user.FailedSignInCount = 0;
+            }
+
+            await _db.SaveChangesAsync(cancellationToken);
         }
 
         // public async Task<Result<User>> SignInSocial(string email, string password, string? callback)

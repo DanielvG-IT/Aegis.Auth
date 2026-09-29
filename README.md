@@ -25,6 +25,7 @@ This is v0.1 — actively developed. The feature set below reflects what is **ac
 - Email verification (optionally required before sign-in)
 - Password reset (token-only, no session required)
 - CSRF protection
+- Opt-in persistent account lockout after repeated failed sign-ins
 - Rate limiting / brute-force protection
 - OAuth (Google, GitHub, Microsoft, Apple) with account linking and PKCE (S256) by default
 
@@ -106,6 +107,21 @@ builder.Services.AddAegisAuth<AppDbContext>(options =>
 
 Startup validation fails if `RequireEmailVerification`, `SendOnSignUp` or `SendOnSignIn` is
 enabled without a `SendVerificationEmail` delegate.
+
+## Account lockout
+
+Opt-in, because anyone who knows an email address can lock that account:
+
+```csharp
+options.AccountLockout.Enabled = true;
+options.AccountLockout.MaxFailedAttempts = 10;
+options.AccountLockout.LockoutDuration = TimeSpan.FromMinutes(15);
+options.AccountLockout.PermanentLockout = false; // true: stays locked until unlocked
+```
+
+Locked accounts get `ACCOUNT_LOCKED` (HTTP 403). Unlock from your own admin endpoint with
+`IAccountLockoutService.UnlockAsync(userId)`. Lockout state lives on `User`
+(`FailedSignInCount`, `LockoutUntil`), so add a migration when upgrading.
 
 ## Extending the database model
 

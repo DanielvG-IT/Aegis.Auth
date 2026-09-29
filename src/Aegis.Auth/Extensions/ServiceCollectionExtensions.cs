@@ -89,6 +89,7 @@ namespace Aegis.Auth.Extensions
 
             services.AddScoped<ISessionService, SessionService>();
             services.AddScoped<ISignInService, SignInService>();
+            services.AddScoped<IAccountLockoutService, AccountLockoutService>();
             services.AddScoped<IOAuthService, OAuthService>();
             services.AddScoped<ISignUpService, SignUpService>();
             services.AddScoped<ISignOutService, SignOutService>();
@@ -139,6 +140,19 @@ namespace Aegis.Auth.Extensions
                 }
 
                 ValidateEmailDeliveryOptions(options, errors);
+
+                if (options.AccountLockout.Enabled)
+                {
+                    if (options.AccountLockout.MaxFailedAttempts <= 0)
+                    {
+                        errors.Add("AegisAuthOptions.AccountLockout.MaxFailedAttempts must be greater than 0.");
+                    }
+
+                    if (options.AccountLockout.PermanentLockout is false && options.AccountLockout.LockoutDuration <= TimeSpan.Zero)
+                    {
+                        errors.Add("AegisAuthOptions.AccountLockout.LockoutDuration must be greater than zero.");
+                    }
+                }
                 ValidateOAuthProviderOptions(options, errors);
 
                 if (options.Session.ExpiresIn < 0)

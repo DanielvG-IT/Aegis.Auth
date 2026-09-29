@@ -29,6 +29,8 @@ namespace Aegis.Auth.Constants
             public const string EmailNotVerified = "EMAIL_NOT_VERIFIED";
             public const string UserAlreadyExists = "USER_ALREADY_EXISTS";
             public const string EmailAlreadyVerified = "EMAIL_ALREADY_VERIFIED";
+            public const string AccountLocked = "ACCOUNT_LOCKED";
+            public const string UserNotFound = "USER_NOT_FOUND";
         }
 
         // 🎟️ Single-use tokens (password reset, email verification)

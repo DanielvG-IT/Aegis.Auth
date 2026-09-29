@@ -13,6 +13,7 @@ namespace Aegis.Auth.Options
         public OAuthOptions OAuth { get; set; } = new();
         public CsrfOptions Csrf { get; set; } = new();
         public RateLimitOptions RateLimit { get; set; } = new();
+        public AccountLockoutOptions AccountLockout { get; set; } = new();
 
         public EmailVerificationOptions EmailVerification { get; set; } = new();
 

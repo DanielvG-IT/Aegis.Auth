@@ -14,6 +14,7 @@ internal static class AegisHttpResultMapper
             AuthErrors.Identity.InvalidCredentials => StatusCodes.Status401Unauthorized,
             AuthErrors.Identity.InvalidEmailOrPassword => StatusCodes.Status401Unauthorized,
             AuthErrors.Identity.EmailNotVerified => StatusCodes.Status403Forbidden,
+            AuthErrors.Identity.AccountLocked => StatusCodes.Status403Forbidden,
             AuthErrors.System.FeatureDisabled => StatusCodes.Status403Forbidden,
             AuthErrors.System.VerificationEmailNotEnabled => StatusCodes.Status403Forbidden,
             AuthErrors.System.ProviderNotFound => StatusCodes.Status404NotFound,

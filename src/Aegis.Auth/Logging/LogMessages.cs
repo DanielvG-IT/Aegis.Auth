@@ -126,6 +126,18 @@ namespace Aegis.Auth.Logging
             Message = "SignIn successful for user {UserId}")]
         internal static partial void SignInSuccessful(this ILogger logger, string userId);
 
+        [LoggerMessage(
+            EventId = 1019,
+            Level = LogLevel.Warning,
+            Message = "SignIn blocked: Account {UserId} is locked out")]
+        internal static partial void SignInAccountLocked(this ILogger logger, string userId);
+
+        [LoggerMessage(
+            EventId = 1020,
+            Level = LogLevel.Warning,
+            Message = "Account {UserId} locked after {FailedAttempts} failed sign-in attempts")]
+        internal static partial void SignInAccountLockedOut(this ILogger logger, string userId, int failedAttempts);
+
         // ═══════════════════════════════════════════════════════════════════════════════
         // Sign Up Messages
         // ═══════════════════════════════════════════════════════════════════════════════
