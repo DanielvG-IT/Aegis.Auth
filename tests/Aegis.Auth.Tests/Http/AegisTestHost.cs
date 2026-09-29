@@ -1,3 +1,5 @@
+using System.Net;
+
 using Aegis.Auth.Extensions;
 using Aegis.Auth.Http.Extensions;
 using Aegis.Auth.Options;
@@ -17,6 +19,12 @@ namespace Aegis.Auth.Tests.Http;
 /// </summary>
 internal sealed class AegisTestHost : IAsyncDisposable
 {
+    /// <summary>
+    /// TestServer connections have no remote address; requests carrying this header get it as
+    /// <c>Connection.RemoteIpAddress</c>, standing in for the forwarded headers middleware.
+    /// </summary>
+    public const string ClientIpHeader = "X-Test-Client-IP";
+
     private readonly WebApplication _app;
 
     public HttpClient Client { get; }
@@ -47,6 +55,7 @@ internal sealed class AegisTestHost : IAsyncDisposable
             options.AppName = "AegisHttpTest";
             options.BaseURL = "http://localhost";
             options.Secret = "test-secret-that-is-long-enough-for-hmac-256-operations!!";
+            options.EmailAndPassword.Enabled = true;
             options.EmailAndPassword.Password = new PasswordOptions
             {
                 Hash = password => Task.FromResult($"hashed:{password}"),
@@ -58,6 +67,15 @@ internal sealed class AegisTestHost : IAsyncDisposable
         configureServices?.Invoke(builder.Services);
 
         WebApplication app = builder.Build();
+        app.Use((context, next) =>
+        {
+            if (context.Request.Headers.TryGetValue(ClientIpHeader, out var clientIp))
+            {
+                context.Connection.RemoteIpAddress = IPAddress.Parse(clientIp.ToString());
+            }
+
+            return next(context);
+        });
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapAegisAuthEndpoints(configureEndpoints);

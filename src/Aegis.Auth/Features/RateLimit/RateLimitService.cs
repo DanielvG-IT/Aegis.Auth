@@ -1,147 +1,124 @@
+using System.Net;
+using System.Net.Sockets;
+using System.Threading.RateLimiting;
+
 using Aegis.Auth.Options;
 
 using Microsoft.Extensions.Options;
 
 namespace Aegis.Auth.Features.RateLimit;
 
-public interface IRateLimitService
+internal readonly record struct RateLimitDecision(bool IsAllowed, TimeSpan? RetryAfter)
+{
+    public static RateLimitDecision Allowed { get; } = new(true, null);
+}
+
+internal interface IRateLimitService
 {
     /// <summary>
-    /// Checks if an operation (by IP) is allowed. Returns true if allowed; false if rate limit exceeded.
+    /// Consumes one attempt for <paramref name="operation"/> from the client's per-minute budget
+    /// (<see cref="RateLimitOptions.MaxAttemptsPerIpPerMinute"/>).
     /// </summary>
-    bool IsAllowedByIp(string ipAddress, string operation = "auth");
+    RateLimitDecision TryAcquireForClient(string operation, IPAddress? clientAddress);
 
     /// <summary>
-    /// Checks if an operation (by email) is allowed. Returns true if allowed; false if rate limit exceeded.
+    /// Consumes one sign-in attempt from the email's 15-minute budget
+    /// (<see cref="RateLimitOptions.MaxAttemptsPerEmailPer15Minutes"/>).
     /// </summary>
-    bool IsAllowedByEmail(string email, string operation = "auth");
-
-    /// <summary>
-    /// Records a failed attempt by IP.
-    /// </summary>
-    void RecordFailureByIp(string ipAddress, string operation = "auth");
-
-    /// <summary>
-    /// Records a failed attempt by email.
-    /// </summary>
-    void RecordFailureByEmail(string email, string operation = "auth");
-
-    /// <summary>
-    /// Resets the failure count for an IP (e.g., after successful auth).
-    /// </summary>
-    void ResetIp(string ipAddress, string operation = "auth");
-
-    /// <summary>
-    /// Resets the failure count for an email (e.g., after successful auth).
-    /// </summary>
-    void ResetEmail(string email, string operation = "auth");
+    RateLimitDecision TryAcquireForEmail(string normalizedEmail);
 }
 
 /// <summary>
-/// Simple in-memory rate limiter. For production with multiple instances, use IDistributedCache.
+/// In-memory fixed-window limiter built on <see cref="PartitionedRateLimiter"/>, which evicts idle
+/// partitions on its own so memory stays bounded by the clients active in the current window.
+/// State is per process: with several instances each one enforces the limits independently.
 /// </summary>
-internal sealed class RateLimitService(IOptions<RateLimitOptions> optionsAccessor) : IRateLimitService
+internal sealed class RateLimitService : IRateLimitService, IDisposable
 {
-    private readonly RateLimitOptions _options = optionsAccessor.Value;
-    private readonly Dictionary<string, (int count, DateTime resetTime)> _ipAttempts = new();
-    private readonly Dictionary<string, (int count, DateTime resetTime)> _emailAttempts = new();
-    private readonly object _lockObj = new();
+    private const string UnknownClient = "unknown";
 
-    public bool IsAllowedByIp(string ipAddress, string operation = "auth")
+    private static readonly TimeSpan ClientWindow = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan EmailWindow = TimeSpan.FromMinutes(15);
+
+    private readonly PartitionedRateLimiter<string>? _clientLimiter;
+    private readonly PartitionedRateLimiter<string>? _emailLimiter;
+
+    public RateLimitService(IOptions<AegisAuthOptions> optionsAccessor)
     {
-        if (!_options.Enabled)
-            return true;
-
-        lock (_lockObj)
+        RateLimitOptions options = optionsAccessor.Value.RateLimit;
+        if (options.Enabled is false)
         {
-            var key = $"{operation}:{ipAddress}";
-            if (_ipAttempts.TryGetValue(key, out var attempt))
-            {
-                if (DateTime.UtcNow < attempt.resetTime && attempt.count >= _options.MaxAttemptsPerIpPerMinute)
-                    return false;
-
-                if (DateTime.UtcNow >= attempt.resetTime)
-                    _ipAttempts.Remove(key);
-            }
-
-            return true;
-        }
-    }
-
-    public bool IsAllowedByEmail(string email, string operation = "auth")
-    {
-        if (!_options.Enabled)
-            return true;
-
-        lock (_lockObj)
-        {
-            var key = $"{operation}:{email.ToLowerInvariant()}";
-            if (_emailAttempts.TryGetValue(key, out var attempt))
-            {
-                if (DateTime.UtcNow < attempt.resetTime && attempt.count >= _options.MaxAttemptsPerEmailPer15Minutes)
-                    return false;
-
-                if (DateTime.UtcNow >= attempt.resetTime)
-                    _emailAttempts.Remove(key);
-            }
-
-            return true;
-        }
-    }
-
-    public void RecordFailureByIp(string ipAddress, string operation = "auth")
-    {
-        if (!_options.Enabled)
             return;
-
-        lock (_lockObj)
-        {
-            var key = $"{operation}:{ipAddress}";
-            if (_ipAttempts.TryGetValue(key, out var attempt))
-            {
-                _ipAttempts[key] = (attempt.count + 1, attempt.resetTime);
-            }
-            else
-            {
-                _ipAttempts[key] = (1, DateTime.UtcNow.AddMinutes(1));
-            }
         }
+
+        _clientLimiter = CreateFixedWindowLimiter(options.MaxAttemptsPerIpPerMinute, ClientWindow);
+        _emailLimiter = CreateFixedWindowLimiter(options.MaxAttemptsPerEmailPer15Minutes, EmailWindow);
     }
 
-    public void RecordFailureByEmail(string email, string operation = "auth")
+    public RateLimitDecision TryAcquireForClient(string operation, IPAddress? clientAddress) =>
+        TryAcquire(_clientLimiter, $"{operation}|{GetClientPartitionKey(clientAddress)}");
+
+    public RateLimitDecision TryAcquireForEmail(string normalizedEmail) =>
+        TryAcquire(_emailLimiter, normalizedEmail);
+
+    public void Dispose()
     {
-        if (!_options.Enabled)
-            return;
-
-        lock (_lockObj)
-        {
-            var key = $"{operation}:{email.ToLowerInvariant()}";
-            if (_emailAttempts.TryGetValue(key, out var attempt))
-            {
-                _emailAttempts[key] = (attempt.count + 1, attempt.resetTime);
-            }
-            else
-            {
-                _emailAttempts[key] = (1, DateTime.UtcNow.AddMinutes(15));
-            }
-        }
+        _clientLimiter?.Dispose();
+        _emailLimiter?.Dispose();
     }
 
-    public void ResetIp(string ipAddress, string operation = "auth")
+    /// <summary>
+    /// IPv6 clients usually control a whole /64, so rotating the interface identifier must not
+    /// reset their budget. IPv4-mapped addresses share the bucket of the plain IPv4 address.
+    /// </summary>
+    internal static string GetClientPartitionKey(IPAddress? address)
     {
-        lock (_lockObj)
+        if (address is null)
         {
-            var key = $"{operation}:{ipAddress}";
-            _ipAttempts.Remove(key);
+            return UnknownClient;
         }
+
+        if (address.IsIPv4MappedToIPv6)
+        {
+            address = address.MapToIPv4();
+        }
+
+        if (address.AddressFamily is not AddressFamily.InterNetworkV6)
+        {
+            return address.ToString();
+        }
+
+        Span<byte> bytes = stackalloc byte[16];
+        address.TryWriteBytes(bytes, out _);
+        bytes[8..].Clear();
+        return $"{new IPAddress(bytes)}/64";
     }
 
-    public void ResetEmail(string email, string operation = "auth")
+    private static RateLimitDecision TryAcquire(PartitionedRateLimiter<string>? limiter, string partitionKey)
     {
-        lock (_lockObj)
+        if (limiter is null)
         {
-            var key = $"{operation}:{email.ToLowerInvariant()}";
-            _emailAttempts.Remove(key);
+            return RateLimitDecision.Allowed;
         }
+
+        using RateLimitLease lease = limiter.AttemptAcquire(partitionKey);
+        if (lease.IsAcquired)
+        {
+            return RateLimitDecision.Allowed;
+        }
+
+        return lease.TryGetMetadata(MetadataName.RetryAfter, out TimeSpan retryAfter)
+            ? new RateLimitDecision(false, retryAfter)
+            : new RateLimitDecision(false, null);
     }
+
+    private static PartitionedRateLimiter<string> CreateFixedWindowLimiter(int permitLimit, TimeSpan window) =>
+        PartitionedRateLimiter.Create<string, string>(partitionKey =>
+            RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = permitLimit,
+                Window = window,
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            }));
 }

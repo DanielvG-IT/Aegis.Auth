@@ -1,6 +1,7 @@
 using Aegis.Auth.Constants;
 using Aegis.Auth.Entities;
 using Aegis.Auth.Features.EmailVerification;
+using Aegis.Auth.Features.RateLimit;
 using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Features.SignIn;
 using Aegis.Auth.Tests.Helpers;
@@ -19,6 +20,7 @@ public sealed class SignInServiceTests : IDisposable
     private readonly ServiceTestFixture _fixture;
     private readonly Mock<ISessionService> _sessionMock;
     private readonly Mock<IEmailVerificationService> _emailVerificationMock;
+    private readonly RateLimitService _rateLimitService;
     private readonly SignInService _sut;
 
     public SignInServiceTests()
@@ -26,15 +28,21 @@ public sealed class SignInServiceTests : IDisposable
         _fixture = new ServiceTestFixture();
         _sessionMock = new Mock<ISessionService>(MockBehavior.Strict);
         _emailVerificationMock = new Mock<IEmailVerificationService>(MockBehavior.Strict);
+        _rateLimitService = new RateLimitService(Microsoft.Extensions.Options.Options.Create(_fixture.Options));
         _sut = new SignInService(
             Microsoft.Extensions.Options.Options.Create(_fixture.Options),
             _fixture.LoggerFactory,
             _fixture.DbContext,
             _sessionMock.Object,
-            _emailVerificationMock.Object);
+            _emailVerificationMock.Object,
+            _rateLimitService);
     }
 
-    public void Dispose() => _fixture.Dispose();
+    public void Dispose()
+    {
+        _rateLimitService.Dispose();
+        _fixture.Dispose();
+    }
 
     private static SignInEmailInput ValidInput(
         string email = "existing@test.com",
@@ -387,6 +395,79 @@ public sealed class SignInServiceTests : IDisposable
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // PER-EMAIL RATE LIMIT — Default: 5 attempts per 15 minutes
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task SignInEmail_EmailLimitReached_ReturnsTooManyRequestsWithoutCreatingSession()
+    {
+        await _fixture.SeedUserAsync();
+
+        for (var i = 0; i < _fixture.Options.RateLimit.MaxAttemptsPerEmailPer15Minutes; i++)
+        {
+            Result<SignInResult> failed = await _sut.SignInEmail(ValidInput(password: "WrongPassword!"));
+            Assert.Equal(AuthErrors.Identity.InvalidEmailOrPassword, failed.ErrorCode);
+        }
+
+        // Correct password now: the strict session mock has no setup, so reaching session creation would throw.
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput());
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.RateLimit.TooManyRequests, result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task SignInEmail_EmailLimit_CountsNormalizedEmail()
+    {
+        await _fixture.SeedUserAsync();
+        string[] variants = ["existing@test.com", "EXISTING@test.com", "  Existing@Test.com  ", "existing@TEST.COM", "eXiStInG@test.com"];
+
+        foreach (var variant in variants)
+        {
+            await _sut.SignInEmail(ValidInput(email: variant, password: "WrongPassword!"));
+        }
+
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput(password: "WrongPassword!"));
+
+        Assert.Equal(AuthErrors.RateLimit.TooManyRequests, result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task SignInEmail_EmailLimit_UnknownEmailLimitedLikeExistingEmail()
+    {
+        await _fixture.SeedUserAsync();
+
+        Result<SignInResult>? existing = null;
+        Result<SignInResult>? unknown = null;
+        for (var i = 0; i <= _fixture.Options.RateLimit.MaxAttemptsPerEmailPer15Minutes; i++)
+        {
+            existing = await _sut.SignInEmail(ValidInput(password: "WrongPassword!"));
+            unknown = await _sut.SignInEmail(ValidInput(email: "ghost@test.com", password: "WrongPassword!"));
+        }
+
+        // Limited before the user lookup, so the response reveals nothing about account existence.
+        Assert.Equal(AuthErrors.RateLimit.TooManyRequests, existing!.ErrorCode);
+        Assert.Equal(existing.ErrorCode, unknown!.ErrorCode);
+        Assert.Equal(existing.Message, unknown.Message);
+    }
+
+    [Fact]
+    public async Task SignInEmail_InvalidEmailFormat_DoesNotConsumeEmailBudget()
+    {
+        await _fixture.SeedUserAsync();
+        SetupSessionMock();
+
+        for (var i = 0; i < 10; i++)
+        {
+            await _sut.SignInEmail(ValidInput(email: "not-an-email"));
+        }
+
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput());
+
+        Assert.True(result.IsSuccess);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // Helpers
     // ═══════════════════════════════════════════════════════════════════════════
 
@@ -619,8 +700,24 @@ public sealed class SignInServiceTests : IDisposable
         var (user, _) = await _fixture.SeedUserAsync();
         SetupSession();
 
-        await FailSignInAsync(20);
-        Result<SignInResult> result = await _sut.SignInEmail(ValidInput());
+        // The per-email rate limit would stop these attempts long before the lockout threshold,
+        // so this test uses a service without it to observe lockout tracking in isolation.
+        _fixture.Options.RateLimit.Enabled = false;
+        using var noRateLimit = new RateLimitService(Microsoft.Extensions.Options.Options.Create(_fixture.Options));
+        var sut = new SignInService(
+            Microsoft.Extensions.Options.Options.Create(_fixture.Options),
+            _fixture.LoggerFactory,
+            _fixture.DbContext,
+            _sessionMock.Object,
+            _emailVerificationMock.Object,
+            noRateLimit);
+
+        for (var i = 0; i < 20; i++)
+        {
+            await sut.SignInEmail(ValidInput(password: "WrongPassword!"));
+        }
+
+        Result<SignInResult> result = await sut.SignInEmail(ValidInput());
 
         Assert.True(result.IsSuccess);
         Assert.Equal(0, user.FailedSignInCount);

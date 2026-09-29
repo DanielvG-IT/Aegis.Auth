@@ -19,6 +19,7 @@ internal static class AegisHttpResultMapper
             AuthErrors.System.VerificationEmailNotEnabled => StatusCodes.Status403Forbidden,
             AuthErrors.System.ProviderNotFound => StatusCodes.Status404NotFound,
             AuthErrors.Session.SessionNotFound => StatusCodes.Status404NotFound,
+            AuthErrors.RateLimit.TooManyRequests => StatusCodes.Status429TooManyRequests,
             AuthErrors.System.InternalError => StatusCodes.Status500InternalServerError,
             AuthErrors.System.FailedToCreateSession => StatusCodes.Status500InternalServerError,
             _ => StatusCodes.Status400BadRequest,
@@ -29,6 +30,7 @@ internal static class AegisHttpResultMapper
             StatusCodes.Status401Unauthorized => "Unauthorized",
             StatusCodes.Status403Forbidden => "Forbidden",
             StatusCodes.Status404NotFound => "Not Found",
+            StatusCodes.Status429TooManyRequests => "Too Many Requests",
             StatusCodes.Status500InternalServerError => "Internal Server Error",
             _ => "Bad Request",
         };

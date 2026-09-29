@@ -2,6 +2,7 @@ using Aegis.Auth.Abstractions;
 using Aegis.Auth.Constants;
 using Aegis.Auth.Entities;
 using Aegis.Auth.Features.EmailVerification;
+using Aegis.Auth.Features.RateLimit;
 using Aegis.Auth.Http.Internal;
 
 using Microsoft.AspNetCore.Builder;
@@ -16,11 +17,13 @@ internal static class EmailVerificationEndpoints
     {
         group.MapPost("/email-verify/send-token", SendVerificationTokenAsync)
             .WithName("AegisAuth.EmailVerification.SendToken")
-            .WithSummary("Send an email verification token");
+            .WithSummary("Send an email verification token")
+            .RequireAegisRateLimit("email-verify-send-token");
 
         group.MapPost("/email-verify/verify", VerifyEmailAsync)
             .WithName("AegisAuth.EmailVerification.Verify")
-            .WithSummary("Verify an email address with a token");
+            .WithSummary("Verify an email address with a token")
+            .RequireAegisRateLimit("email-verify");
 
         return group;
     }
