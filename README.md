@@ -20,7 +20,7 @@ This is v0.1 — actively developed. The feature set below reflects what is **ac
 - `HttpContext.User` population with claims
 - `[Authorize]` and `RequireAuthorization()` support
 - `RequireAegisAuth()` convenience wrapper for minimal APIs
-- Optional distributed cache layer (Redis/memory) on top of PostgreSQL
+- Optional distributed cache layer (any `IDistributedCache`, e.g. Redis/memory) on top of the database; without one, sessions are stored in the database only
 - Optional encrypted cookie session data cache
 - Email verification (optionally required before sign-in)
 - Password reset (token-only, no session required)
