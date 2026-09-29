@@ -126,6 +126,18 @@ namespace Aegis.Auth.Logging
             Message = "SignIn successful for user {UserId}")]
         internal static partial void SignInSuccessful(this ILogger logger, string userId);
 
+        [LoggerMessage(
+            EventId = 1019,
+            Level = LogLevel.Warning,
+            Message = "SignIn blocked: Account {UserId} is locked out")]
+        internal static partial void SignInAccountLocked(this ILogger logger, string userId);
+
+        [LoggerMessage(
+            EventId = 1020,
+            Level = LogLevel.Warning,
+            Message = "Account {UserId} locked after {FailedAttempts} failed sign-in attempts")]
+        internal static partial void SignInAccountLockedOut(this ILogger logger, string userId, int failedAttempts);
+
         // ═══════════════════════════════════════════════════════════════════════════════
         // Sign Up Messages
         // ═══════════════════════════════════════════════════════════════════════════════
@@ -305,5 +317,77 @@ namespace Aegis.Auth.Logging
             Level = LogLevel.Information,
             Message = "SignOut successful for user {UserId}")]
         internal static partial void SignOutSuccessful(this ILogger logger, string userId);
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // Password Reset Messages
+        // ═══════════════════════════════════════════════════════════════════════════════
+
+        [LoggerMessage(
+            EventId = 5000,
+            Level = LogLevel.Debug,
+            Message = "Password reset requested for an email without a credential account; no token issued")]
+        internal static partial void PasswordResetNoCredentialAccount(this ILogger logger);
+
+        [LoggerMessage(
+            EventId = 5001,
+            Level = LogLevel.Information,
+            Message = "Password reset token delivered for user {UserId}")]
+        internal static partial void PasswordResetTokenSent(this ILogger logger, string userId);
+
+        [LoggerMessage(
+            EventId = 5002,
+            Level = LogLevel.Error,
+            Message = "Password reset token delivery failed for user {UserId}")]
+        internal static partial void PasswordResetDeliveryFailed(this ILogger logger, string userId, Exception exception);
+
+        [LoggerMessage(
+            EventId = 5003,
+            Level = LogLevel.Warning,
+            Message = "Password reset failed: Invalid, expired or consumed token")]
+        internal static partial void PasswordResetInvalidToken(this ILogger logger);
+
+        [LoggerMessage(
+            EventId = 5004,
+            Level = LogLevel.Information,
+            Message = "Password reset successful for user {UserId}")]
+        internal static partial void PasswordResetSuccessful(this ILogger logger, string userId);
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // Email Verification Messages
+        // ═══════════════════════════════════════════════════════════════════════════════
+
+        [LoggerMessage(
+            EventId = 6000,
+            Level = LogLevel.Information,
+            Message = "Verification token delivered for user {UserId}")]
+        internal static partial void EmailVerificationTokenSent(this ILogger logger, string userId);
+
+        [LoggerMessage(
+            EventId = 6001,
+            Level = LogLevel.Error,
+            Message = "Verification token delivery failed for user {UserId}")]
+        internal static partial void EmailVerificationDeliveryFailed(this ILogger logger, string userId, Exception exception);
+
+        [LoggerMessage(
+            EventId = 6002,
+            Level = LogLevel.Warning,
+            Message = "Email verification failed: Invalid, expired or consumed token")]
+        internal static partial void EmailVerificationInvalidToken(this ILogger logger);
+
+        [LoggerMessage(
+            EventId = 6003,
+            Level = LogLevel.Information,
+            Message = "Email verified for user {UserId}")]
+        internal static partial void EmailVerificationSuccessful(this ILogger logger, string userId);
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // OAuth Configuration Messages
+        // ═══════════════════════════════════════════════════════════════════════════════
+
+        [LoggerMessage(
+            EventId = 7000,
+            Level = LogLevel.Warning,
+            Message = "PKCE is disabled for the {Provider} OAuth provider. Authorization codes are not bound to this client; enable UsePkce unless the provider rejects it")]
+        internal static partial void OAuthPkceDisabled(this ILogger logger, string provider);
     }
 }

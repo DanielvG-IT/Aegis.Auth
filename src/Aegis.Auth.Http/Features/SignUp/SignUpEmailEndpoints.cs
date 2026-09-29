@@ -36,6 +36,7 @@ internal static class SignUpEmailEndpoints
             Image = request.Image,
             Email = request.Email,
             Password = request.Password,
+            RememberMe = request.RememberMe,
             UserAgent = httpContext.GetClientUserAgent(),
             IpAddress = httpContext.GetClientIpAddress(),
         };
@@ -50,7 +51,7 @@ internal static class SignUpEmailEndpoints
 
         if (data.Session is not null)
         {
-            cookieHandler.SetSessionCookie(httpContext, data.Session, data.User, rememberMe: false);
+            cookieHandler.SetSessionCookie(httpContext, data.Session, data.User, request.RememberMe);
         }
 
         var validatedCallback = CallbackValidator.Validate(request.Callback, optionsAccessor.Value);

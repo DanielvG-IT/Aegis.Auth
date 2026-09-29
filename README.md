@@ -22,11 +22,12 @@ This is v0.1 — actively developed. The feature set below reflects what is **ac
 - `RequireAegisAuth()` convenience wrapper for minimal APIs
 - Optional distributed cache layer (Redis/memory) on top of PostgreSQL
 - Optional encrypted cookie session data cache
-- Email verification
-- Password reset
+- Email verification (optionally required before sign-in)
+- Password reset (token-only, no session required)
 - CSRF protection
+- Opt-in persistent account lockout after repeated failed sign-ins
 - Rate limiting / brute-force protection
-- OAuth (Google, GitHub, Microsoft, Apple) with account linking
+- OAuth (Google, GitHub, Microsoft, Apple) with account linking and PKCE (S256) by default
 
 ### Planned
 
@@ -75,6 +76,52 @@ app.MapGet("/api/me", (HttpContext ctx) =>
 })
 .RequireAegisAuth();
 ```
+
+## Password reset & email verification
+
+Tokens are delivered only through delegates you configure; they never appear in an HTTP
+response. The endpoints under `/api/auth/password-reset/*` and `/api/auth/email-verify/*`
+are mapped only when the matching delegate is set.
+
+```csharp
+builder.Services.AddAegisAuth<AppDbContext>(options =>
+{
+    // ...
+    options.EmailAndPassword.SendResetPassword = (ctx, ct) =>
+        ctx.Services.GetRequiredService<IEmailSender>()
+            .SendResetLinkAsync(ctx.User.Email, $"https://app.example.com/reset?token={ctx.Token}", ct);
+
+    options.EmailAndPassword.RequireEmailVerification = true; // block sign-in until verified
+    options.EmailVerification.SendVerificationEmail = (ctx, ct) =>
+        ctx.Services.GetRequiredService<IEmailSender>()
+            .SendVerifyLinkAsync(ctx.User.Email, $"https://app.example.com/verify?token={ctx.Token}", ct);
+});
+```
+
+| Endpoint | Body | Notes |
+| --- | --- | --- |
+| `POST /api/auth/password-reset/send-token` | `{ email }` | Same response whether or not the account exists |
+| `POST /api/auth/password-reset/reset` | `{ token, newPassword }` | Revokes all sessions by default (`RevokeSessionsOnPasswordReset`) |
+| `POST /api/auth/email-verify/send-token` | `{ email? }` | Uses the session's user when signed in |
+| `POST /api/auth/email-verify/verify` | `{ token }` | No session required |
+
+Startup validation fails if `RequireEmailVerification`, `SendOnSignUp` or `SendOnSignIn` is
+enabled without a `SendVerificationEmail` delegate.
+
+## Account lockout
+
+Opt-in, because anyone who knows an email address can lock that account:
+
+```csharp
+options.AccountLockout.Enabled = true;
+options.AccountLockout.MaxFailedAttempts = 10;
+options.AccountLockout.LockoutDuration = TimeSpan.FromMinutes(15);
+options.AccountLockout.PermanentLockout = false; // true: stays locked until unlocked
+```
+
+Locked accounts get `ACCOUNT_LOCKED` (HTTP 403). Unlock from your own admin endpoint with
+`IAccountLockoutService.UnlockAsync(userId)`. Lockout state lives on `User`
+(`FailedSignInCount`, `LockoutUntil`), so add a migration when upgrading.
 
 ## Extending the database model
 

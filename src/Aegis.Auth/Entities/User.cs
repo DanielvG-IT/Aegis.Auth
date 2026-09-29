@@ -15,6 +15,17 @@ namespace Aegis.Auth.Entities
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
 
+        /// <summary>
+        /// Consecutive failed password sign-ins. Reset on success and when a lockout starts.
+        /// </summary>
+        public int FailedSignInCount { get; set; }
+
+        /// <summary>
+        /// Password sign-in is rejected until this time (UTC). <see cref="DateTime.MaxValue"/>
+        /// means locked until explicitly unlocked.
+        /// </summary>
+        public DateTime? LockoutUntil { get; set; }
+
         // Relations — JsonIgnore prevents circular reference during cache serialization
         [JsonIgnore]
         public ICollection<Account> Accounts { get; } = [];

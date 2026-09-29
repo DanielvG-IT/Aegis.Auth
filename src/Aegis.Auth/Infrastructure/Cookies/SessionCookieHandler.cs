@@ -21,7 +21,6 @@ namespace Aegis.Auth.Infrastructure.Cookies
         // [ ] Add secure prefix strategy (__Host-/__Secure-) and configurable cookie prefix
         // [ ] Add optional cross-subdomain domain support
         // [ ] Add chunking for oversized session_data cookies (>4093 bytes)
-        // [ ] Align remember-me behavior between sign-in and sign-up flows
 
         private string SessionCookieName => _isDevelopment ? "aegis.session" : "__Host-aegis.session";
         private string SessionDataCookieName => _isDevelopment ? "aegis.session_data" : "__Host-aegis.session_data";

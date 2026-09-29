@@ -1,5 +1,6 @@
 using Aegis.Auth.Constants;
 using Aegis.Auth.Entities;
+using Aegis.Auth.Features.EmailVerification;
 using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Features.SignIn;
 using Aegis.Auth.Tests.Helpers;
@@ -17,17 +18,20 @@ public sealed class SignInServiceTests : IDisposable
 {
     private readonly ServiceTestFixture _fixture;
     private readonly Mock<ISessionService> _sessionMock;
+    private readonly Mock<IEmailVerificationService> _emailVerificationMock;
     private readonly SignInService _sut;
 
     public SignInServiceTests()
     {
         _fixture = new ServiceTestFixture();
         _sessionMock = new Mock<ISessionService>(MockBehavior.Strict);
+        _emailVerificationMock = new Mock<IEmailVerificationService>(MockBehavior.Strict);
         _sut = new SignInService(
             Microsoft.Extensions.Options.Options.Create(_fixture.Options),
             _fixture.LoggerFactory,
             _fixture.DbContext,
-            _sessionMock.Object);
+            _sessionMock.Object,
+            _emailVerificationMock.Object);
     }
 
     public void Dispose() => _fixture.Dispose();
@@ -403,5 +407,232 @@ public sealed class SignInServiceTests : IDisposable
         _sessionMock
             .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<Session>.Success(CreateMockSession()));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // EMAIL VERIFICATION GATE
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private void RequireVerification(bool? sendOnSignIn = null)
+    {
+        _fixture.Options.EmailAndPassword.RequireEmailVerification = true;
+        _fixture.Options.EmailVerification.SendOnSignIn = sendOnSignIn;
+        _fixture.Options.EmailVerification.SendVerificationEmail = (_, _) => Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task SignInEmail_RequireVerification_UnverifiedUser_BlockedAndEmailSent()
+    {
+        RequireVerification();
+        await _fixture.SeedUserAsync();
+        _emailVerificationMock
+            .Setup(s => s.SendVerificationEmailAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput());
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.Identity.EmailNotVerified, result.ErrorCode);
+        _emailVerificationMock.Verify(s => s.SendVerificationEmailAsync(It.Is<User>(u => u.Email == "existing@test.com"), It.IsAny<CancellationToken>()), Times.Once);
+        _sessionMock.Verify(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SignInEmail_RequireVerification_SendOnSignInFalse_BlockedWithoutEmail()
+    {
+        RequireVerification(sendOnSignIn: false);
+        await _fixture.SeedUserAsync();
+
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput());
+
+        Assert.Equal(AuthErrors.Identity.EmailNotVerified, result.ErrorCode);
+        _emailVerificationMock.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task SignInEmail_RequireVerification_WrongPassword_DoesNotRevealVerificationState()
+    {
+        RequireVerification();
+        await _fixture.SeedUserAsync();
+
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput(password: "WrongPassword!"));
+
+        Assert.Equal(AuthErrors.Identity.InvalidEmailOrPassword, result.ErrorCode);
+        _emailVerificationMock.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task SignInEmail_RequireVerification_VerifiedUser_SignsIn()
+    {
+        RequireVerification();
+        var (user, _) = await _fixture.SeedUserAsync();
+        user.EmailVerified = true;
+        await _fixture.DbContext.SaveChangesAsync();
+        _sessionMock
+            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<Session>.Success(CreateMockSession()));
+
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput());
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task SignInEmail_VerificationNotRequired_UnverifiedUserSignsIn()
+    {
+        await _fixture.SeedUserAsync();
+        _sessionMock
+            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<Session>.Success(CreateMockSession()));
+
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput());
+
+        Assert.True(result.IsSuccess);
+        _emailVerificationMock.VerifyNoOtherCalls();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ACCOUNT LOCKOUT
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private void EnableLockout(int maxAttempts = 3, bool permanent = false)
+    {
+        _fixture.Options.AccountLockout.Enabled = true;
+        _fixture.Options.AccountLockout.MaxFailedAttempts = maxAttempts;
+        _fixture.Options.AccountLockout.LockoutDuration = TimeSpan.FromMinutes(15);
+        _fixture.Options.AccountLockout.PermanentLockout = permanent;
+    }
+
+    private async Task FailSignInAsync(int times)
+    {
+        for (var i = 0; i < times; i++)
+        {
+            await _sut.SignInEmail(ValidInput(password: "WrongPassword!"));
+        }
+    }
+
+    private void SetupSession() => _sessionMock
+        .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(Result<Session>.Success(CreateMockSession()));
+
+    [Fact]
+    public async Task Lockout_AfterMaxFailedAttempts_RejectsEvenCorrectPassword()
+    {
+        EnableLockout(maxAttempts: 3);
+        var (user, _) = await _fixture.SeedUserAsync();
+
+        await FailSignInAsync(3);
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput());
+
+        Assert.Equal(AuthErrors.Identity.AccountLocked, result.ErrorCode);
+        Assert.NotNull(user.LockoutUntil);
+        Assert.InRange(user.LockoutUntil!.Value, DateTime.UtcNow.AddMinutes(14), DateTime.UtcNow.AddMinutes(16));
+        _sessionMock.Verify(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Lockout_BelowThreshold_StillAllowsSignIn()
+    {
+        EnableLockout(maxAttempts: 3);
+        await _fixture.SeedUserAsync();
+        SetupSession();
+
+        await FailSignInAsync(2);
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput());
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task Lockout_SuccessfulSignIn_ResetsFailureCounter()
+    {
+        EnableLockout(maxAttempts: 3);
+        var (user, _) = await _fixture.SeedUserAsync();
+        SetupSession();
+
+        await FailSignInAsync(2);
+        await _sut.SignInEmail(ValidInput());
+        await FailSignInAsync(2);
+
+        Assert.Equal(2, user.FailedSignInCount);
+        Assert.Null(user.LockoutUntil);
+    }
+
+    [Fact]
+    public async Task Lockout_Expired_AllowsSignInAndDoesNotRelockOnNextFailure()
+    {
+        EnableLockout(maxAttempts: 3);
+        var (user, _) = await _fixture.SeedUserAsync();
+        SetupSession();
+        await FailSignInAsync(3);
+
+        user.LockoutUntil = DateTime.UtcNow.AddSeconds(-1);
+        await _fixture.DbContext.SaveChangesAsync();
+        await FailSignInAsync(1);
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput());
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(0, user.FailedSignInCount);
+        Assert.Null(user.LockoutUntil);
+    }
+
+    [Fact]
+    public async Task Lockout_Permanent_NeverExpiresUntilUnlocked()
+    {
+        EnableLockout(maxAttempts: 2, permanent: true);
+        var (user, _) = await _fixture.SeedUserAsync();
+        SetupSession();
+        await FailSignInAsync(2);
+
+        Assert.Equal(DateTime.MaxValue, user.LockoutUntil);
+        Assert.Equal(AuthErrors.Identity.AccountLocked, (await _sut.SignInEmail(ValidInput())).ErrorCode);
+
+        var unlock = new AccountLockoutService(_fixture.DbContext);
+        Assert.True((await unlock.UnlockAsync(user.Id)).IsSuccess);
+
+        Assert.True((await _sut.SignInEmail(ValidInput())).IsSuccess);
+    }
+
+    [Fact]
+    public async Task Lockout_LockedAccount_StillHashesToEqualizeTiming()
+    {
+        var hashCalls = 0;
+        Func<string, Task<string>> originalHash = _fixture.Options.EmailAndPassword.Password.Hash;
+        _fixture.Options.EmailAndPassword.Password.Hash = p =>
+        {
+            hashCalls++;
+            return originalHash(p);
+        };
+        EnableLockout(maxAttempts: 1);
+        await _fixture.SeedUserAsync();
+        await FailSignInAsync(1);
+        hashCalls = 0;
+
+        await _sut.SignInEmail(ValidInput());
+
+        Assert.Equal(1, hashCalls);
+    }
+
+    [Fact]
+    public async Task Lockout_Disabled_DoesNotTrackFailures()
+    {
+        var (user, _) = await _fixture.SeedUserAsync();
+        SetupSession();
+
+        await FailSignInAsync(20);
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput());
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(0, user.FailedSignInCount);
+    }
+
+    [Fact]
+    public async Task Unlock_UnknownUser_ReturnsUserNotFound()
+    {
+        var unlock = new AccountLockoutService(_fixture.DbContext);
+
+        Result result = await unlock.UnlockAsync("missing-user");
+
+        Assert.Equal(AuthErrors.Identity.UserNotFound, result.ErrorCode);
     }
 }

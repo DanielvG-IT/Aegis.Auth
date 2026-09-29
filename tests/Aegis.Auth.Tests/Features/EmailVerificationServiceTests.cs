@@ -1,235 +1,263 @@
+using Aegis.Auth.Constants;
 using Aegis.Auth.Core.Crypto;
 using Aegis.Auth.Entities;
 using Aegis.Auth.Features.EmailVerification;
+using Aegis.Auth.Options;
 using Aegis.Auth.Tests.Helpers;
+
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Aegis.Auth.Tests.Features;
 
 public sealed class EmailVerificationServiceTests : IDisposable
 {
     private readonly ServiceTestFixture _fixture;
+    private readonly ServiceProvider _services = new ServiceCollection().BuildServiceProvider();
+    private readonly List<SendVerificationEmailContext> _sent = [];
     private readonly EmailVerificationService _sut;
 
     public EmailVerificationServiceTests()
     {
-        _fixture = new ServiceTestFixture();
-        _sut = new EmailVerificationService(_fixture.DbContext);
+        _fixture = new ServiceTestFixture(o =>
+            o.EmailVerification.SendVerificationEmail = (ctx, _) =>
+            {
+                _sent.Add(ctx);
+                return Task.CompletedTask;
+            });
+        _sut = new EmailVerificationService(
+            Microsoft.Extensions.Options.Options.Create(_fixture.Options),
+            _fixture.LoggerFactory,
+            _fixture.DbContext,
+            _services);
     }
 
-    public void Dispose() => _fixture.Dispose();
-
-    private User CreateTestUser(string? id = null) => new()
+    public void Dispose()
     {
-        Id = id ?? Guid.CreateVersion7().ToString(),
-        Name = "Email Verification Test User",
-        Email = "emailtest@test.com",
-        EmailVerified = false,
-        CreatedAt = DateTime.UtcNow,
-        UpdatedAt = DateTime.UtcNow,
-    };
-
-    [Fact]
-    public async Task GenerateVerificationToken_ValidUser_ReturnsToken()
-    {
-        // Arrange
-        var user = CreateTestUser();
-        _fixture.DbContext.Users.Add(user);
-        await _fixture.DbContext.SaveChangesAsync();
-
-        // Act
-        var token = await _sut.GenerateVerificationTokenAsync(user.Id);
-
-        // Assert
-        Assert.NotNull(token);
-        Assert.NotEmpty(token);
-        Assert.Equal(32, token.Length); // Random 32-char string
+        _services.Dispose();
+        _fixture.Dispose();
     }
 
-    [Fact]
-    public async Task GenerateVerificationToken_StoresTokenHashNotRaw()
-    {
-        // Arrange
-        var user = CreateTestUser();
-        _fixture.DbContext.Users.Add(user);
-        await _fixture.DbContext.SaveChangesAsync();
+    private AuthToken? StoredToken(string rawToken) =>
+        _fixture.DbContext.AuthTokens.FirstOrDefault(t => t.TokenHash == AegisCrypto.HashToken(rawToken));
 
-        // Act
+    // ═══════════════════════════════════════════════════════════════════════════
+    // TOKEN GENERATION
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task GenerateVerificationToken_StoresHashWithConfiguredExpiry()
+    {
+        _fixture.Options.EmailVerification.ExpiresIn = 60;
+        var (user, _) = await _fixture.SeedUserAsync();
+
         var rawToken = await _sut.GenerateVerificationTokenAsync(user.Id);
 
-        // Assert
-        var authToken = _fixture.DbContext.AuthTokens
-            .FirstOrDefault(t => t.UserId == user.Id);
-
-        Assert.NotNull(authToken);
+        Assert.Equal(32, rawToken.Length);
+        AuthToken authToken = StoredToken(rawToken)!;
         Assert.NotEqual(rawToken, authToken.TokenHash);
-        Assert.Equal(AegisCrypto.HashToken(rawToken), authToken.TokenHash);
+        Assert.Equal(EmailVerificationService.TokenPurpose, authToken.Purpose);
+        Assert.InRange(authToken.ExpiresAt - authToken.CreatedAt, TimeSpan.FromSeconds(59), TimeSpan.FromSeconds(61));
     }
 
     [Fact]
-    public async Task VerifyEmail_ValidToken_SucceedsAndMarksConsumed()
+    public async Task GenerateVerificationToken_InvalidatesPreviousUnusedTokens()
     {
-        // Arrange
-        var user = CreateTestUser();
-        _fixture.DbContext.Users.Add(user);
+        var (user, _) = await _fixture.SeedUserAsync();
+
+        var first = await _sut.GenerateVerificationTokenAsync(user.Id);
+        var second = await _sut.GenerateVerificationTokenAsync(user.Id);
+
+        Assert.False((await _sut.VerifyEmailAsync(first)).IsSuccess);
+        Assert.True((await _sut.VerifyEmailAsync(second)).IsSuccess);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SEND — delivery via the configured delegate
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task SendVerificationEmail_UnverifiedUser_DeliversRawTokenToDelegate()
+    {
+        var (user, _) = await _fixture.SeedUserAsync();
+
+        Result result = await _sut.SendVerificationEmailAsync(user);
+
+        Assert.True(result.IsSuccess);
+        SendVerificationEmailContext sent = Assert.Single(_sent);
+        Assert.Equal(user.Id, sent.User.Id);
+        Assert.NotNull(StoredToken(sent.Token));
+    }
+
+    [Fact]
+    public async Task SendVerificationEmail_AlreadyVerified_ReturnsEmailAlreadyVerified()
+    {
+        var (user, _) = await _fixture.SeedUserAsync();
+        user.EmailVerified = true;
+
+        Result result = await _sut.SendVerificationEmailAsync(user);
+
+        Assert.Equal(AuthErrors.Identity.EmailAlreadyVerified, result.ErrorCode);
+        Assert.Empty(_sent);
+    }
+
+    [Fact]
+    public async Task SendVerificationEmail_NoDelegate_ReturnsNotEnabled()
+    {
+        _fixture.Options.EmailVerification.SendVerificationEmail = null;
+        var (user, _) = await _fixture.SeedUserAsync();
+
+        Result result = await _sut.SendVerificationEmailAsync(user);
+
+        Assert.Equal(AuthErrors.System.VerificationEmailNotEnabled, result.ErrorCode);
+        Assert.Empty(_fixture.DbContext.AuthTokens);
+    }
+
+    [Fact]
+    public async Task SendVerificationEmail_DelegateThrows_ReturnsInternalError()
+    {
+        _fixture.Options.EmailVerification.SendVerificationEmail = (_, _) => throw new InvalidOperationException("SMTP down");
+        var (user, _) = await _fixture.SeedUserAsync();
+
+        Result result = await _sut.SendVerificationEmailAsync(user);
+
+        Assert.Equal(AuthErrors.System.InternalError, result.ErrorCode);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // REQUEST BY EMAIL — user enumeration
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task RequestVerificationEmail_UnverifiedUser_SendsWithNormalizedEmail()
+    {
+        await _fixture.SeedUserAsync(email: "existing@test.com");
+
+        Result result = await _sut.RequestVerificationEmailAsync(" Existing@TEST.com ");
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(_sent);
+    }
+
+    [Fact]
+    public async Task RequestVerificationEmail_UnknownEmail_SucceedsWithoutSending()
+    {
+        Result result = await _sut.RequestVerificationEmailAsync("nobody@test.com");
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(_sent);
+    }
+
+    [Fact]
+    public async Task RequestVerificationEmail_AlreadyVerified_SucceedsWithoutSending()
+    {
+        var (user, _) = await _fixture.SeedUserAsync();
+        user.EmailVerified = true;
         await _fixture.DbContext.SaveChangesAsync();
 
+        Result result = await _sut.RequestVerificationEmailAsync(user.Email);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(_sent);
+    }
+
+    [Fact]
+    public async Task RequestVerificationEmail_DelegateThrows_StillReportsSuccess()
+    {
+        _fixture.Options.EmailVerification.SendVerificationEmail = (_, _) => throw new InvalidOperationException("SMTP down");
+        var (user, _) = await _fixture.SeedUserAsync();
+
+        Result result = await _sut.RequestVerificationEmailAsync(user.Email);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task RequestVerificationEmail_BlankEmail_ReturnsEmailRequired()
+    {
+        Result result = await _sut.RequestVerificationEmailAsync(" ");
+
+        Assert.Equal(AuthErrors.Validation.EmailRequired, result.ErrorCode);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // VERIFY — token redemption without a session
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task VerifyEmail_ValidToken_MarksUserVerifiedAndConsumesToken()
+    {
+        var (user, _) = await _fixture.SeedUserAsync();
         var rawToken = await _sut.GenerateVerificationTokenAsync(user.Id);
 
-        // Act
-        var result = await _sut.VerifyEmailAsync(user.Id, rawToken);
+        Result<User> result = await _sut.VerifyEmailAsync(rawToken);
 
-        // Assert
-        Assert.True(result);
-
-        var authToken = _fixture.DbContext.AuthTokens
-            .FirstOrDefault(t => t.UserId == user.Id);
-        Assert.NotNull(authToken);
-        Assert.NotNull(authToken.ConsumedAt);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(user.Id, result.Value!.Id);
+        Assert.True(user.EmailVerified);
+        Assert.NotNull(StoredToken(rawToken)!.ConsumedAt);
     }
 
     [Fact]
-    public async Task VerifyEmail_InvalidToken_Fails()
+    public async Task VerifyEmail_UnknownToken_ReturnsInvalidToken()
     {
-        // Arrange
-        var user = CreateTestUser();
-        _fixture.DbContext.Users.Add(user);
-        await _fixture.DbContext.SaveChangesAsync();
+        Result<User> result = await _sut.VerifyEmailAsync("definitely-not-a-real-token-value");
 
-        await _sut.GenerateVerificationTokenAsync(user.Id);
-
-        // Act
-        var result = await _sut.VerifyEmailAsync(user.Id, "invalid-token-123");
-
-        // Assert
-        Assert.False(result);
+        Assert.Equal(AuthErrors.Token.InvalidToken, result.ErrorCode);
     }
 
     [Fact]
-    public async Task VerifyEmail_ExpiredToken_Fails()
+    public async Task VerifyEmail_ExpiredToken_ReturnsInvalidToken()
     {
-        // Arrange
-        var user = CreateTestUser();
-        _fixture.DbContext.Users.Add(user);
-        await _fixture.DbContext.SaveChangesAsync();
-
+        var (user, _) = await _fixture.SeedUserAsync();
         var rawToken = await _sut.GenerateVerificationTokenAsync(user.Id);
-
-        // Manually expire the token
-        var authToken = _fixture.DbContext.AuthTokens
-            .First(t => t.UserId == user.Id);
-        authToken.ExpiresAt = DateTime.UtcNow.AddMinutes(-1);
-        _fixture.DbContext.AuthTokens.Update(authToken);
+        StoredToken(rawToken)!.ExpiresAt = DateTime.UtcNow.AddMinutes(-1);
         await _fixture.DbContext.SaveChangesAsync();
 
-        // Act
-        var result = await _sut.VerifyEmailAsync(user.Id, rawToken);
+        Result<User> result = await _sut.VerifyEmailAsync(rawToken);
 
-        // Assert
-        Assert.False(result);
-    }
-
-    [Fact]
-    public async Task VerifyEmail_AlreadyConsumed_Fails()
-    {
-        // Arrange
-        var user = CreateTestUser();
-        _fixture.DbContext.Users.Add(user);
-        await _fixture.DbContext.SaveChangesAsync();
-
-        var rawToken = await _sut.GenerateVerificationTokenAsync(user.Id);
-
-        // Consume the token once
-        await _sut.VerifyEmailAsync(user.Id, rawToken);
-
-        // Act — try to consume again
-        var result = await _sut.VerifyEmailAsync(user.Id, rawToken);
-
-        // Assert
-        Assert.False(result);
-    }
-
-    [Fact]
-    public async Task VerifyEmail_SingleUseOnly()
-    {
-        // Arrange
-        var user = CreateTestUser();
-        _fixture.DbContext.Users.Add(user);
-        await _fixture.DbContext.SaveChangesAsync();
-
-        var rawToken = await _sut.GenerateVerificationTokenAsync(user.Id);
-
-        // Act — first verification
-        var firstResult = await _sut.VerifyEmailAsync(user.Id, rawToken);
-        // Second verification attempt with same token
-        var secondResult = await _sut.VerifyEmailAsync(user.Id, rawToken);
-
-        // Assert
-        Assert.True(firstResult);
-        Assert.False(secondResult);
-    }
-
-    [Fact]
-    public async Task MarkEmailVerified_ValidUser_SetsEmailVerified()
-    {
-        // Arrange
-        var user = CreateTestUser();
-        _fixture.DbContext.Users.Add(user);
-        await _fixture.DbContext.SaveChangesAsync();
-
+        Assert.Equal(AuthErrors.Token.InvalidToken, result.ErrorCode);
         Assert.False(user.EmailVerified);
-
-        // Act
-        await _sut.MarkEmailVerifiedAsync(user.Id);
-
-        // Assert
-        var updatedUser = _fixture.DbContext.Users.First(u => u.Id == user.Id);
-        Assert.True(updatedUser.EmailVerified);
     }
 
     [Fact]
-    public async Task VerifyAndMarkEmail_CompleteFlow()
+    public async Task VerifyEmail_TokenIsSingleUse()
     {
-        // Arrange
-        var user = CreateTestUser();
-        _fixture.DbContext.Users.Add(user);
-        await _fixture.DbContext.SaveChangesAsync();
-
-        // Act
+        var (user, _) = await _fixture.SeedUserAsync();
         var rawToken = await _sut.GenerateVerificationTokenAsync(user.Id);
-        var verified = await _sut.VerifyEmailAsync(user.Id, rawToken);
-        await _sut.MarkEmailVerifiedAsync(user.Id);
 
-        // Assert
-        Assert.True(verified);
-        var updatedUser = _fixture.DbContext.Users.First(u => u.Id == user.Id);
-        Assert.True(updatedUser.EmailVerified);
+        Assert.True((await _sut.VerifyEmailAsync(rawToken)).IsSuccess);
+        Result<User> second = await _sut.VerifyEmailAsync(rawToken);
+
+        Assert.Equal(AuthErrors.Token.InvalidToken, second.ErrorCode);
     }
 
     [Fact]
-    public async Task GenerateVerificationToken_MultiplePurposes_CanCoexist()
+    public async Task VerifyEmail_PasswordResetToken_IsRejected()
     {
-        // This test verifies that the (UserId, Purpose, TokenHash) unique index
-        // allows different purposes (e.g., "email-verification" vs "password-reset")
-        // to coexist, but prevents multiple tokens of the same purpose for a user.
-
-        // Arrange
-        var user = CreateTestUser();
-        _fixture.DbContext.Users.Add(user);
+        var (user, _) = await _fixture.SeedUserAsync();
+        const string rawToken = "reset-token-for-other-purpose";
+        _fixture.DbContext.AuthTokens.Add(new AuthToken
+        {
+            Id = Guid.CreateVersion7().ToString(),
+            TokenHash = AegisCrypto.HashToken(rawToken),
+            Purpose = "password-reset",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(10),
+            CreatedAt = DateTime.UtcNow,
+            UserId = user.Id,
+        });
         await _fixture.DbContext.SaveChangesAsync();
 
-        // Act — generate two verification tokens
-        var token1 = await _sut.GenerateVerificationTokenAsync(user.Id);
-        var token2 = await _sut.GenerateVerificationTokenAsync(user.Id);
+        Result<User> result = await _sut.VerifyEmailAsync(rawToken);
 
-        // Assert — the second token should have overwritten/invalidated first, or they both exist
-        // Since we're using a unique index, the second should fail or we should only see one
-        // Actually, the unique index on (UserId, Purpose, TokenHash) means the HASH can't be duplicated,
-        // but different tokens will have different hashes, so both should exist.
-        var tokens = _fixture.DbContext.AuthTokens
-            .Where(t => t.UserId == user.Id && t.Purpose == "email-verification")
-            .ToList();
+        Assert.Equal(AuthErrors.Token.InvalidToken, result.ErrorCode);
+        Assert.False(user.EmailVerified);
+    }
 
-        Assert.Equal(2, tokens.Count);
-        Assert.NotEqual(tokens[0].TokenHash, tokens[1].TokenHash);
+    [Fact]
+    public async Task VerifyEmail_BlankToken_ReturnsInvalidInput()
+    {
+        Result<User> result = await _sut.VerifyEmailAsync("");
+
+        Assert.Equal(AuthErrors.Validation.InvalidInput, result.ErrorCode);
     }
 }

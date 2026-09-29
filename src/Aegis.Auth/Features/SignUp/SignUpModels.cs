@@ -24,6 +24,12 @@ namespace Aegis.Auth.Features.SignUp
         public string? Image { get; init; }
 
         public string? Callback { get; init; }
+
+        /// <summary>
+        /// When false, the auto sign-in session is created as a browser-session cookie and
+        /// a short-lived (1 day) database session — identical to sign-in with RememberMe = false.
+        /// </summary>
+        public bool RememberMe { get; init; } = true;
     }
 
     public class SignUpEmailInput : SignUpEmailRequest

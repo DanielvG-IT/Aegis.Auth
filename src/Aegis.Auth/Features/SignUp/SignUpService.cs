@@ -1,6 +1,7 @@
 using Aegis.Auth.Abstractions;
 using Aegis.Auth.Constants;
 using Aegis.Auth.Entities;
+using Aegis.Auth.Features.EmailVerification;
 using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Logging;
 using Aegis.Auth.Options;
@@ -18,8 +19,9 @@ namespace Aegis.Auth.Features.SignUp
         Task<Result<SignUpResult>> SignUpEmail(SignUpEmailInput input, CancellationToken cancellationToken = default);
     }
 
-    internal sealed partial class SignUpService(IOptions<AegisAuthOptions> optionsAccessor, ILoggerFactory loggerFactory, IAuthDbContext dbContext, ISessionService sessionService) : ISignUpService
+    internal sealed partial class SignUpService(IOptions<AegisAuthOptions> optionsAccessor, ILoggerFactory loggerFactory, IAuthDbContext dbContext, ISessionService sessionService, IEmailVerificationService emailVerificationService) : ISignUpService
     {
+        private readonly IEmailVerificationService _emailVerificationService = emailVerificationService;
         private readonly IAuthDbContext _db = dbContext;
         private readonly AegisAuthOptions _options = optionsAccessor.Value;
         private readonly ISessionService _sessionService = sessionService;
@@ -131,27 +133,15 @@ namespace Aegis.Auth.Features.SignUp
                 return Result<SignUpResult>.Failure(AuthErrors.System.InternalError, "Creating user failed.");
             }
 
-            /*
-                        var shouldSendVerificationEmail = _options.EmailVerification.SendOnSignUp is true ?? _options.EmailAndPassword.RequireEmailVerification is true;
-                        if (shouldSendVerificationEmail is true)
-                        {
-                            // If we can't send emails, we just dead-end here.
-                            if (_options.EmailVerification?.SendVerificationEmail is null)
-                            {
-                                _logger.SignInEmailVerificationNotConfigured(user.Id);
-                                return Result<SignUpResult>.Failure(AuthErrors.Identity.EmailNotVerified, "Email is not verified.");
-                            }
-
-                            var sendOnSignIn = _options.EmailVerification.SendOnSignUp;
-                            var requireEmailVer = _options.EmailAndPassword.RequireEmailVerification;
-
-                            var emailVerifytoken = await _emailService.CreateEmailVerificationToken(_options.Secret, user.Email, null, _options.EmailVerification?.ExpiresIn);
-
-                        }
-            */
+            var shouldSendVerificationEmail = _options.EmailVerification.SendOnSignUp ?? _options.EmailAndPassword.RequireEmailVerification;
+            if (shouldSendVerificationEmail && _options.EmailVerification.SendVerificationEmail is not null)
+            {
+                // A delivery failure must not undo a successful sign-up; the user can request a new email.
+                await _emailVerificationService.SendVerificationEmailAsync(user, cancellationToken);
+            }
 
             Session? session = null;
-            var shouldAutoSignIn = _options.EmailAndPassword.AutoSignIn is true; // && _options.EmailAndPassword.RequireEmailVerification is false; TODO Add this in v0.2
+            var shouldAutoSignIn = _options.EmailAndPassword.AutoSignIn && _options.EmailAndPassword.RequireEmailVerification is false;
             if (shouldAutoSignIn is true)
             {
                 var sessionInput = new SessionCreateInput
@@ -159,7 +149,7 @@ namespace Aegis.Auth.Features.SignUp
                     User = user,
                     IpAddress = input.IpAddress,
                     UserAgent = input.UserAgent,
-                    DontRememberMe = true
+                    DontRememberMe = !input.RememberMe
                 };
                 session = (await _sessionService.CreateSessionAsync(sessionInput, cancellationToken)).Value;
             }

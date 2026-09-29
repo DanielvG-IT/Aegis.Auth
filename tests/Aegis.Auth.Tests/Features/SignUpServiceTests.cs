@@ -1,5 +1,6 @@
 using Aegis.Auth.Constants;
 using Aegis.Auth.Entities;
+using Aegis.Auth.Features.EmailVerification;
 using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Features.SignUp;
 using Aegis.Auth.Options;
@@ -20,17 +21,20 @@ public sealed class SignUpServiceTests : IDisposable
 {
     private readonly ServiceTestFixture _fixture;
     private readonly Mock<ISessionService> _sessionMock;
+    private readonly Mock<IEmailVerificationService> _emailVerificationMock;
     private readonly SignUpService _sut;
 
     public SignUpServiceTests()
     {
         _fixture = new ServiceTestFixture();
         _sessionMock = new Mock<ISessionService>(MockBehavior.Strict);
+        _emailVerificationMock = new Mock<IEmailVerificationService>(MockBehavior.Strict);
         _sut = new SignUpService(
             Microsoft.Extensions.Options.Options.Create(_fixture.Options),
             _fixture.LoggerFactory,
             _fixture.DbContext,
-            _sessionMock.Object);
+            _sessionMock.Object,
+            _emailVerificationMock.Object);
     }
 
     public void Dispose() => _fixture.Dispose();
@@ -365,8 +369,49 @@ public sealed class SignUpServiceTests : IDisposable
 
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value!.Session);
-        _sessionMock.Verify(s => s.CreateSessionAsync(It.Is<SessionCreateInput>(
-            i => i.DontRememberMe == true)), Times.Once);
+        _sessionMock.Verify(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task SignUpEmail_RememberMe_MapsToSessionDontRememberMeLikeSignIn(bool rememberMe, bool expectedDontRememberMe)
+    {
+        _fixture.Options.EmailAndPassword.AutoSignIn = true;
+        SessionCreateInput? capturedInput = null;
+        _sessionMock
+            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()))
+            .Callback<SessionCreateInput, CancellationToken>((i, _) => capturedInput = i)
+            .ReturnsAsync(Result<Session>.Success(CreateMockSession()));
+
+        SignUpEmailInput input = new()
+        {
+            Email = "remember@test.com",
+            Password = "StrongPass123!",
+            Name = "Remember User",
+            RememberMe = rememberMe,
+            UserAgent = "TestAgent/1.0",
+            IpAddress = "127.0.0.1",
+        };
+        await _sut.SignUpEmail(input);
+
+        Assert.NotNull(capturedInput);
+        Assert.Equal(expectedDontRememberMe, capturedInput!.DontRememberMe);
+    }
+
+    [Fact]
+    public async Task SignUpEmail_RememberMeDefault_IsRemembered()
+    {
+        _fixture.Options.EmailAndPassword.AutoSignIn = true;
+        SessionCreateInput? capturedInput = null;
+        _sessionMock
+            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()))
+            .Callback<SessionCreateInput, CancellationToken>((i, _) => capturedInput = i)
+            .ReturnsAsync(Result<Session>.Success(CreateMockSession()));
+
+        await _sut.SignUpEmail(ValidInput());
+
+        Assert.False(capturedInput!.DontRememberMe, "Sign-up defaults must match sign-in (RememberMe = true)");
     }
 
     [Fact]
@@ -518,5 +563,71 @@ public sealed class SignUpServiceTests : IDisposable
         _sessionMock
             .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<Session>.Success(CreateMockSession()));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // EMAIL VERIFICATION ON SIGN-UP
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task SignUpEmail_RequireVerification_SendsEmailAndSkipsAutoSignIn()
+    {
+        _fixture.Options.EmailAndPassword.RequireEmailVerification = true;
+        _fixture.Options.EmailVerification.SendVerificationEmail = (_, _) => Task.CompletedTask;
+        _emailVerificationMock
+            .Setup(s => s.SendVerificationEmailAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+
+        Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput());
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value!.Session);
+        _emailVerificationMock.Verify(s => s.SendVerificationEmailAsync(It.Is<User>(u => u.Email == "new@test.com"), It.IsAny<CancellationToken>()), Times.Once);
+        _sessionMock.Verify(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SignUpEmail_SendOnSignUpWithoutRequirement_SendsEmailAndAutoSignsIn()
+    {
+        _fixture.Options.EmailVerification.SendOnSignUp = true;
+        _fixture.Options.EmailVerification.SendVerificationEmail = (_, _) => Task.CompletedTask;
+        _emailVerificationMock
+            .Setup(s => s.SendVerificationEmailAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+        _sessionMock
+            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<Session>.Success(CreateMockSession()));
+
+        Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput());
+
+        Assert.NotNull(result.Value!.Session);
+        _emailVerificationMock.Verify(s => s.SendVerificationEmailAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task SignUpEmail_VerificationDeliveryFails_SignUpStillSucceeds()
+    {
+        _fixture.Options.EmailAndPassword.RequireEmailVerification = true;
+        _fixture.Options.EmailVerification.SendVerificationEmail = (_, _) => Task.CompletedTask;
+        _emailVerificationMock
+            .Setup(s => s.SendVerificationEmailAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Failure(AuthErrors.System.InternalError, "SMTP down"));
+
+        Result<SignUpResult> result = await _sut.SignUpEmail(ValidInput());
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(_fixture.DbContext.Users);
+    }
+
+    [Fact]
+    public async Task SignUpEmail_VerificationNotConfigured_DoesNotSend()
+    {
+        _sessionMock
+            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<Session>.Success(CreateMockSession()));
+
+        await _sut.SignUpEmail(ValidInput());
+
+        _emailVerificationMock.VerifyNoOtherCalls();
     }
 }

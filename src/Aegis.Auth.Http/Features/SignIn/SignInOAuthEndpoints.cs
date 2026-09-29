@@ -49,7 +49,7 @@ internal static class SignInOAuthEndpoints
             query.Add(new KeyValuePair<string, string?>("callback", request.Callback));
         }
 
-        if (!request.RememberMe)
+        if (!request.ShouldRemember)
         {
             query.Add(new KeyValuePair<string, string?>("rememberMe", bool.FalseString.ToLowerInvariant()));
         }
@@ -100,7 +100,7 @@ internal static class SignInOAuthEndpoints
                 Identity = identity,
                 UserAgent = httpContext.GetClientUserAgent(),
                 IpAddress = httpContext.GetClientIpAddress(),
-                RememberMe = request.RememberMe,
+                RememberMe = request.ShouldRemember,
                 Callback = request.Callback,
             },
             cancellationToken);
@@ -113,7 +113,7 @@ internal static class SignInOAuthEndpoints
         }
 
         OAuthSignInResult data = result.Value;
-        cookieHandler.SetSessionCookie(httpContext, data.Session, data.User, request.RememberMe);
+        cookieHandler.SetSessionCookie(httpContext, data.Session, data.User, request.ShouldRemember);
 
         var validatedCallback = CallbackValidator.Validate(request.Callback, options);
         var shouldRedirect = validatedCallback is not null;
@@ -170,6 +170,9 @@ internal static class SignInOAuthEndpoints
     internal sealed class OAuthChallengeRequest
     {
         public string? Callback { get; init; }
-        public bool RememberMe { get; init; } = true;
+        // Nullable so minimal APIs treat the query parameter as optional; absent means remember.
+        public bool? RememberMe { get; init; }
+
+        internal bool ShouldRemember => RememberMe ?? true;
     }
 }

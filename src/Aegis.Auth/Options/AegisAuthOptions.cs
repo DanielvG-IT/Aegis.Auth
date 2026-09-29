@@ -13,13 +13,9 @@ namespace Aegis.Auth.Options
         public OAuthOptions OAuth { get; set; } = new();
         public CsrfOptions Csrf { get; set; } = new();
         public RateLimitOptions RateLimit { get; set; } = new();
+        public AccountLockoutOptions AccountLockout { get; set; } = new();
 
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // EMAIL VERIFICATION - DISABLED FOR v0.1, WILL BE RE-ENABLED IN v0.2
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // TODO v0.2: Uncomment this property for email verification support
-        // public EmailVerificationOptions? EmailVerification { get; set; }
-        // ═══════════════════════════════════════════════════════════════════════════════
+        public EmailVerificationOptions EmailVerification { get; set; } = new();
 
         public SessionOptions Session { get; set; } = new();
     }

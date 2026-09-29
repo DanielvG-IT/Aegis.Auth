@@ -45,6 +45,23 @@ builder.Services.AddAegisAuth<SampleAuthDbContext>(options =>
     // Enable email/password authentication
     options.EmailAndPassword.Enabled = true;
 
+    // Deliver password reset and verification tokens by email. Aegis never returns these
+    // tokens over HTTP; your frontend receives them through the link in the email.
+    options.EmailAndPassword.SendResetPassword = (ctx, ct) =>
+        ctx.Services.GetRequiredService<IEmailSender>().SendAsync(
+            ctx.User.Email,
+            "Reset your password",
+            $"Reset your password: {options.BaseURL}/reset-password?token={Uri.EscapeDataString(ctx.Token)}",
+            ct);
+
+    options.EmailVerification.SendOnSignUp = true;
+    options.EmailVerification.SendVerificationEmail = (ctx, ct) =>
+        ctx.Services.GetRequiredService<IEmailSender>().SendAsync(
+            ctx.User.Email,
+            "Verify your email",
+            $"Verify your email: {options.BaseURL}/verify-email?token={Uri.EscapeDataString(ctx.Token)}",
+            ct);
+
     var googleClientId = builder.Configuration["AegisAuth:OAuth:Google:ClientId"];
     var googleClientSecret = builder.Configuration["AegisAuth:OAuth:Google:ClientSecret"];
     if (string.IsNullOrWhiteSpace(googleClientId) is false && string.IsNullOrWhiteSpace(googleClientSecret) is false)
@@ -87,6 +104,7 @@ builder.Services.AddAegisAuth<SampleAuthDbContext>(options =>
 
 builder.Services.AddControllers();
 builder.Services.AddScoped<IProjectWorkspaceService, ProjectWorkspaceService>();
+builder.Services.AddSingleton<IEmailSender, LoggingEmailSender>();
 builder.Services.AddProblemDetails();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
