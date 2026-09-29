@@ -32,7 +32,8 @@ builder.Services.AddDbContext<SampleAuthDbContext>(options =>
     options.UseSqlite(connectionString));
 
 
-// Add a memory cache to mock distributed cache
+// Optional: a distributed cache layer for sessions (in-memory here; use e.g. Redis in production).
+// Without an IDistributedCache registration, sessions are stored in the database only.
 builder.Services.AddDistributedMemoryCache();
 
 // Configure Aegis Auth

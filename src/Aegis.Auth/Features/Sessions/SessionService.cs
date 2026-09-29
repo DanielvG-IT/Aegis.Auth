@@ -21,7 +21,9 @@ namespace Aegis.Auth.Features.Sessions
         Task<Result> RevokeAllSessionsAsync(string userId, CancellationToken cancellationToken = default);
     }
 
-    internal sealed class SessionService(IOptions<AegisAuthOptions> optionsAccessor, ILoggerFactory loggerFactory, IAuthDbContext dbContext, IDistributedCache? disCache) : ISessionService
+    // The distributed cache is optional. DI ignores nullable annotations, so the "= null" default is what lets the
+    // container activate this service when no IDistributedCache is registered; sessions are then stored in the database only.
+    internal sealed class SessionService(IOptions<AegisAuthOptions> optionsAccessor, ILoggerFactory loggerFactory, IAuthDbContext dbContext, IDistributedCache? disCache = null) : ISessionService
     {
         private readonly AegisAuthOptions _options = optionsAccessor.Value;
         private readonly IDistributedCache? _cache = disCache;
