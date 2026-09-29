@@ -159,7 +159,7 @@ namespace Aegis.Auth.Features.SignUp
                     User = user,
                     IpAddress = input.IpAddress,
                     UserAgent = input.UserAgent,
-                    DontRememberMe = true
+                    DontRememberMe = !input.RememberMe
                 };
                 session = (await _sessionService.CreateSessionAsync(sessionInput, cancellationToken)).Value;
             }

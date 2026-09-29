@@ -365,8 +365,49 @@ public sealed class SignUpServiceTests : IDisposable
 
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value!.Session);
-        _sessionMock.Verify(s => s.CreateSessionAsync(It.Is<SessionCreateInput>(
-            i => i.DontRememberMe == true)), Times.Once);
+        _sessionMock.Verify(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task SignUpEmail_RememberMe_MapsToSessionDontRememberMeLikeSignIn(bool rememberMe, bool expectedDontRememberMe)
+    {
+        _fixture.Options.EmailAndPassword.AutoSignIn = true;
+        SessionCreateInput? capturedInput = null;
+        _sessionMock
+            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()))
+            .Callback<SessionCreateInput, CancellationToken>((i, _) => capturedInput = i)
+            .ReturnsAsync(Result<Session>.Success(CreateMockSession()));
+
+        SignUpEmailInput input = new()
+        {
+            Email = "remember@test.com",
+            Password = "StrongPass123!",
+            Name = "Remember User",
+            RememberMe = rememberMe,
+            UserAgent = "TestAgent/1.0",
+            IpAddress = "127.0.0.1",
+        };
+        await _sut.SignUpEmail(input);
+
+        Assert.NotNull(capturedInput);
+        Assert.Equal(expectedDontRememberMe, capturedInput!.DontRememberMe);
+    }
+
+    [Fact]
+    public async Task SignUpEmail_RememberMeDefault_IsRemembered()
+    {
+        _fixture.Options.EmailAndPassword.AutoSignIn = true;
+        SessionCreateInput? capturedInput = null;
+        _sessionMock
+            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()))
+            .Callback<SessionCreateInput, CancellationToken>((i, _) => capturedInput = i)
+            .ReturnsAsync(Result<Session>.Success(CreateMockSession()));
+
+        await _sut.SignUpEmail(ValidInput());
+
+        Assert.False(capturedInput!.DontRememberMe, "Sign-up defaults must match sign-in (RememberMe = true)");
     }
 
     [Fact]
