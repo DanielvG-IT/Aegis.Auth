@@ -76,6 +76,7 @@ namespace Aegis.Auth.Extensions
 
             services.AddAuthorization();
             services.AddDataProtection();
+            services.TryAddSingleton(TimeProvider.System);
 
             // Backward compatibility for existing consumers resolving AegisAuthOptions directly.
             services.AddSingleton(sp => sp.GetRequiredService<IOptions<AegisAuthOptions>>().Value);
@@ -84,7 +85,7 @@ namespace Aegis.Auth.Extensions
             {
                 IHostEnvironment env = sp.GetRequiredService<IHostEnvironment>();
                 AegisAuthOptions aegisOptions = sp.GetRequiredService<IOptions<AegisAuthOptions>>().Value;
-                return new SessionCookieHandler(aegisOptions, env.IsDevelopment());
+                return new SessionCookieHandler(aegisOptions, env.IsDevelopment(), sp.GetRequiredService<TimeProvider>());
             });
 
             services.AddScoped<IAuthDbContext>(sp => sp.GetRequiredService<TContext>());
@@ -106,7 +107,6 @@ namespace Aegis.Auth.Extensions
 
             // Secondary storage: in-memory unless AddAegisDistributedCacheSecondaryStorage(),
             // AddAegisDatabaseSecondaryStorage() or a custom IAegisSecondaryStorage replaces it.
-            services.TryAddSingleton(TimeProvider.System);
             services.TryAddSingleton<IAegisSecondaryStorage, InMemorySecondaryStorage>();
             services.AddHostedService<SecondaryStorageStartupDiagnostics>();
 

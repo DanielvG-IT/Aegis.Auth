@@ -12,6 +12,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Aegis.Auth.Tests.Http;
 
@@ -42,7 +43,8 @@ internal sealed class AegisTestHost : IAsyncDisposable
     public static async Task<AegisTestHost> StartAsync(
         Action<AegisAuthOptions>? configure = null,
         Action<AegisAuthEndpointMapOptions>? configureEndpoints = null,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        FakeTimeProvider? timeProvider = null)
     {
         WebApplicationBuilder builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
@@ -57,6 +59,12 @@ internal sealed class AegisTestHost : IAsyncDisposable
         keepAlive.Open();
         builder.Services.AddDbContext<TestDbContext>(o => o.UseSqlite(connectionString));
         builder.Services.AddDistributedMemoryCache();
+        if (timeProvider is not null)
+        {
+            // Registered before AddAegisAuth so its TryAddSingleton(TimeProvider.System) is skipped.
+            builder.Services.AddSingleton<TimeProvider>(timeProvider);
+        }
+
         builder.Services.AddAegisAuth<TestDbContext>(options =>
         {
             options.AppName = "AegisHttpTest";

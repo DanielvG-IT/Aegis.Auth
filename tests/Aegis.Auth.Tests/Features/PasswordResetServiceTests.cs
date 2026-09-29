@@ -39,8 +39,9 @@ public sealed class PasswordResetServiceTests : IDisposable
             _fixture.LoggerFactory,
             _fixture.DbContext,
             _sessionMock.Object,
-            new AuthTokenStore(_fixture.DbContext),
-            _services);
+            new AuthTokenStore(_fixture.DbContext, _fixture.Time),
+            _services,
+            _fixture.Time);
     }
 
     public void Dispose()
@@ -263,13 +264,25 @@ public sealed class PasswordResetServiceTests : IDisposable
     {
         var (user, account) = await _fixture.SeedUserAsync();
         var rawToken = await _sut.GenerateResetTokenAsync(user.Id);
-        StoredToken(rawToken)!.ExpiresAt = DateTime.UtcNow.AddMinutes(-1);
-        await _fixture.DbContext.SaveChangesAsync();
+        _fixture.Time.Advance(TimeSpan.FromSeconds(_fixture.Options.EmailAndPassword.ResetPasswordTokenExpiresIn + 1));
 
         Result result = await _sut.ResetPasswordAsync(rawToken, "NewPassword123!");
 
         Assert.Equal(AuthErrors.Token.InvalidToken, result.ErrorCode);
         Assert.NotEqual("hashed:NewPassword123!", StoredPasswordHash(account));
+    }
+
+    [Fact]
+    public async Task ResetPassword_TokenJustBeforeExpiry_Succeeds()
+    {
+        var (user, account) = await _fixture.SeedUserAsync();
+        var rawToken = await _sut.GenerateResetTokenAsync(user.Id);
+        _fixture.Time.Advance(TimeSpan.FromSeconds(_fixture.Options.EmailAndPassword.ResetPasswordTokenExpiresIn - 1));
+
+        Result result = await _sut.ResetPasswordAsync(rawToken, "NewPassword123!");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("hashed:NewPassword123!", StoredPasswordHash(account));
     }
 
     [Fact]

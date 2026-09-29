@@ -10,10 +10,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Aegis.Auth.Infrastructure.Auth;
 
-internal sealed class AegisAuthContextAccessor(SessionCookieHandler cookieHandler, IAuthDbContext dbContext) : IAegisAuthContextAccessor
+internal sealed class AegisAuthContextAccessor(SessionCookieHandler cookieHandler, IAuthDbContext dbContext, TimeProvider timeProvider) : IAegisAuthContextAccessor
 {
     private readonly SessionCookieHandler _cookieHandler = cookieHandler;
     private readonly IAuthDbContext _db = dbContext;
+    private readonly TimeProvider _time = timeProvider;
 
     public async Task<AegisAuthContext?> GetCurrentAsync(HttpContext httpContext, CancellationToken cancellationToken = default)
     {
@@ -32,10 +33,11 @@ internal sealed class AegisAuthContextAccessor(SessionCookieHandler cookieHandle
         }
 
         // Fast path: prefer validated cookie cache when available.
+        DateTime now = _time.GetUtcNow().UtcDateTime;
         SessionCacheMetadata? cookieCache = _cookieHandler.GetCookieCache(httpContext);
         if (cookieCache is not null
             && string.Equals(cookieCache.Session.Token, sessionToken, StringComparison.Ordinal)
-            && cookieCache.Session.ExpiresAt > DateTime.UtcNow
+            && cookieCache.Session.ExpiresAt > now
             && string.IsNullOrWhiteSpace(cookieCache.User.Id) is false)
         {
             return new AegisAuthContext
@@ -54,7 +56,7 @@ internal sealed class AegisAuthContextAccessor(SessionCookieHandler cookieHandle
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.TokenHash == tokenHash, cancellationToken);
 
-        if (session is null || session.ExpiresAt <= DateTime.UtcNow)
+        if (session is null || session.ExpiresAt <= now)
         {
             return null;
         }

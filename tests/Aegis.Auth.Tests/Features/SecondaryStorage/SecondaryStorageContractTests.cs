@@ -1,6 +1,8 @@
 using Aegis.Auth.Features.SecondaryStorage;
 using Aegis.Auth.Tests.Helpers;
 
+using Microsoft.Extensions.Time.Testing;
+
 namespace Aegis.Auth.Tests.Features.SecondaryStorage;
 
 /// <summary>
@@ -15,7 +17,7 @@ public abstract class SecondaryStorageContractTests
 
     private IAegisSecondaryStorage? _storage;
 
-    private protected ManualTimeProvider Clock { get; } = new();
+    private protected FakeTimeProvider Clock { get; } = new(DateTimeOffset.UtcNow);
 
     protected IAegisSecondaryStorage Storage => _storage ??= CreateStorage(Clock);
 
