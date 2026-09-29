@@ -9,7 +9,7 @@ The roadmap lives in [#86](https://github.com/DanielvG-IT/Aegis.Auth/issues/86);
 |---|---|
 | `src/Aegis.Auth` | Core: entities (`Entities/`), options (`Options/`), one folder per feature with its service (`Features/<Feature>/`), EF model (`Extensions/ModelBuilderExtensions.cs`), DI + startup validation (`Extensions/ServiceCollectionExtensions.cs`), crypto (`Core/Crypto/`), error codes (`Constants/ErrorCodes.cs`), log messages (`Logging/LogMessages.cs`) |
 | `src/Aegis.Auth.Http` | Minimal-API endpoints (`Features/<Feature>/*Endpoints.cs`), endpoint mapping (`Extensions/AegisAuthEndpointRouteBuilderExtensions.cs`), error → ProblemDetails mapping (`Internal/AegisHttpResultMapper.cs`) |
-| `tests/Aegis.Auth.Tests` | xUnit. Service tests use strict Moq mocks + EF InMemory (`Helpers/TestDbContext.cs`); HTTP tests use `Http/AegisTestHost.cs` (TestServer) |
+| `tests/Aegis.Auth.Tests` | xUnit. Service tests use strict Moq mocks + EF InMemory or SQLite in-memory (`Helpers/ServiceTestFixture.cs`, `Helpers/TestDbContext.cs`); HTTP tests use `Http/AegisTestHost.cs` (TestServer on SQLite) |
 | `samples/Aegis.Auth.Sample` | SQLite sample app with EF migrations |
 
 ## Commands (mirror CI)
@@ -35,7 +35,7 @@ The SDK version is pinned in `global.json`. Sample migrations:
 
 1. Only SHA-256 hashes of tokens are stored (`AegisCrypto.HashToken`). Raw tokens go to delivery delegates or signed cookies, **never** to HTTP response bodies or logs.
 2. Endpoints that take an identifier (email, username, phone) respond identically whether or not the account exists.
-3. Single-use tokens and codes are consumed **atomically** (conditional update), never read-check-write. See [#121](https://github.com/DanielvG-IT/Aegis.Auth/issues/121).
+3. Single-use tokens and codes are consumed **atomically** (conditional update), never read-check-write. See [#121](https://github.com/DanielvG-IT/Aegis.Auth/issues/121). Every single-use flow (password reset, email verification, and future magic links, email OTPs, invitations, device codes, one-time tokens) redeems through `IAuthTokenStore.TryConsumeAsync` (`Infrastructure/Tokens/AuthTokenStore.cs`), which runs the dependent writes in the same transaction. Counters such as `FailedSignInCount` are incremented with `ExecuteUpdateAsync`, not read-increment-write.
 4. Redirect and callback URLs go through `CallbackValidator` (`TrustedOrigins`).
 5. Third-party secrets at rest are encrypted with `ITokenEncryptionService`.
 6. Never hand-roll protocol or crypto validation (XML signatures, JWT validation, WebAuthn). Use vetted libraries.
@@ -44,7 +44,7 @@ The SDK version is pinned in `global.json`. Sample migrations:
 ## Tests
 
 - Every new endpoint gets an HTTP test through `AegisTestHost.StartAsync(configure, configureEndpoints, configureServices)`, not only a service test.
-- EF InMemory has no transactions, constraints or `ExecuteUpdate`. Use SQLite in-memory for tests that depend on them.
+- EF InMemory has no transactions, constraints or `ExecuteUpdate`. Use SQLite in-memory for tests that depend on them: `new ServiceTestFixture(useSqlite: true)` for service tests (`AegisTestHost` always uses SQLite). Race tests use `Helpers/SqliteFileDatabase.cs`, which gives each parallel request its own connection.
 - Schema changes update `ApplyAegisAuthModel` (or the plugin's model), set `HasMaxLength` on indexed strings, and add a sample migration.
 
 ## Working on a roadmap issue

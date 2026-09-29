@@ -1,6 +1,7 @@
 using Aegis.Auth.Entities;
 using Aegis.Auth.Options;
 
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
@@ -20,17 +21,29 @@ internal sealed class ServiceTestFixture : IDisposable
     public ILoggerFactory LoggerFactory { get; }
     public AegisAuthOptions Options { get; }
 
+    private readonly SqliteConnection? _connection;
     private static int _dbCounter;
 
-    public ServiceTestFixture(Action<AegisAuthOptions>? configureOptions = null)
+    /// <param name="useSqlite">
+    /// Use SQLite in-memory instead of EF InMemory, for code that needs <c>ExecuteUpdate</c>, transactions or constraints.
+    /// </param>
+    public ServiceTestFixture(Action<AegisAuthOptions>? configureOptions = null, bool useSqlite = false)
     {
-        // Unique in-memory DB per fixture to avoid cross-test contamination
-        var dbName = $"AegisTest_{Interlocked.Increment(ref _dbCounter)}_{Guid.NewGuid():N}";
-        DbContextOptions<TestDbContext> dbOptions = new DbContextOptionsBuilder<TestDbContext>()
-        .UseInMemoryDatabase(dbName)
-        .Options;
+        var builder = new DbContextOptionsBuilder<TestDbContext>();
+        if (useSqlite)
+        {
+            // The database lives as long as this open connection, so each fixture gets its own.
+            _connection = new SqliteConnection("DataSource=:memory:");
+            _connection.Open();
+            builder.UseSqlite(_connection);
+        }
+        else
+        {
+            // Unique in-memory DB per fixture to avoid cross-test contamination
+            builder.UseInMemoryDatabase($"AegisTest_{Interlocked.Increment(ref _dbCounter)}_{Guid.NewGuid():N}");
+        }
 
-        DbContext = new TestDbContext(dbOptions);
+        DbContext = new TestDbContext(builder.Options);
         DbContext.Database.EnsureCreated();
 
         CacheMock = new Mock<IDistributedCache>(MockBehavior.Strict);
@@ -171,6 +184,7 @@ internal sealed class ServiceTestFixture : IDisposable
     {
         DbContext.Database.EnsureDeleted();
         DbContext.Dispose();
+        _connection?.Dispose();
         LoggerFactory.Dispose();
     }
 }
