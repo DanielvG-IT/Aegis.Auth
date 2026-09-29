@@ -45,5 +45,11 @@ namespace Aegis.Auth.Constants
             public const string SessionNotFound = "SESSION_NOT_FOUND";
             public const string SessionExpired = "SESSION_EXPIRED";
         }
+
+        // 🚦 Rate Limiting
+        public static class RateLimit
+        {
+            public const string TooManyRequests = "TOO_MANY_REQUESTS";
+        }
     }
 }

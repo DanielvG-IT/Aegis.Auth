@@ -138,6 +138,12 @@ namespace Aegis.Auth.Logging
             Message = "Account {UserId} locked after {FailedAttempts} failed sign-in attempts")]
         internal static partial void SignInAccountLockedOut(this ILogger logger, string userId, int failedAttempts);
 
+        [LoggerMessage(
+            EventId = 1021,
+            Level = LogLevel.Warning,
+            Message = "SignIn blocked: Too many attempts for provided email")]
+        internal static partial void SignInRateLimited(this ILogger logger);
+
         // ═══════════════════════════════════════════════════════════════════════════════
         // Sign Up Messages
         // ═══════════════════════════════════════════════════════════════════════════════
@@ -389,5 +395,15 @@ namespace Aegis.Auth.Logging
             Level = LogLevel.Warning,
             Message = "PKCE is disabled for the {Provider} OAuth provider. Authorization codes are not bound to this client; enable UsePkce unless the provider rejects it")]
         internal static partial void OAuthPkceDisabled(this ILogger logger, string provider);
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // Rate Limit Messages
+        // ═══════════════════════════════════════════════════════════════════════════════
+
+        [LoggerMessage(
+            EventId = 8000,
+            Level = LogLevel.Warning,
+            Message = "Request rejected: Client exceeded the rate limit for {Operation}")]
+        internal static partial void RateLimitExceeded(this ILogger logger, string operation);
     }
 }

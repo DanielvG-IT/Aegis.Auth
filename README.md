@@ -151,6 +151,22 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 }
 ```
 
+## Rate limiting
+
+Enabled by default. Rejected requests get `429 Too Many Requests` with a problem details body whose `errorCode` is `TOO_MANY_REQUESTS`.
+
+```csharp
+options.RateLimit.Enabled = true;                     // default
+options.RateLimit.MaxAttemptsPerIpPerMinute = 10;     // per client IP, per endpoint
+options.RateLimit.MaxAttemptsPerEmailPer15Minutes = 5; // sign-in attempts per email, from any IP
+```
+
+- The per-IP limit covers email sign-in and sign-up, password reset (send-token, reset) and email verification (send-token, verify). IPv6 clients are grouped by /64.
+- The per-email limit counts every sign-in attempt, successful or not, so a distributed attack cannot brute-force one account.
+- Limits are enforced by the endpoints themselves; no `app.UseRateLimiter()` call is needed.
+- Behind a reverse proxy, configure [forwarded headers](https://learn.microsoft.com/aspnet/core/host-and-deploy/proxy-load-balancer) so each client is seen with its own IP instead of the proxy's.
+- Counters live in memory per application instance, so with several instances each enforces the limits separately.
+
 ## Project structure
 
 ```
