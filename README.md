@@ -26,16 +26,16 @@ This is v0.1 — actively developed. The feature set below reflects what is **ac
 - Password reset (token-only, no session required)
 - CSRF protection
 - Opt-in persistent account lockout after repeated failed sign-ins
-- Rate limiting / brute-force protection
 - OAuth (Google, GitHub, Microsoft, Apple) with account linking and PKCE (S256) by default
+- Rate limiting per client IP and per email (see [Rate limiting](#rate-limiting))
+
+### Known gaps
+
+- Rate limit counters are kept in memory per instance. Shared storage for multi-instance deployments and per-endpoint custom rules are tracked in [#120](https://github.com/DanielvG-IT/Aegis.Auth/issues/120) and [#98](https://github.com/DanielvG-IT/Aegis.Auth/issues/98).
 
 ### Planned
 
-- Passkeys
-- TOTP
-- Hooks / events system
-- `Aegis.Auth.EntityFrameworkCore` package split
-- `Aegis.Auth.OAuth.*` provider packages
+The full roadmap is tracked in [#86](https://github.com/DanielvG-IT/Aegis.Auth/issues/86): plugins, organizations, SSO (OIDC + SAML 2.0), SCIM, passkeys, 2FA, API keys, an OAuth/OIDC provider with MCP support, billing integrations and more. Contributors and coding agents should start with [`AGENTS.md`](AGENTS.md).
 
 ## Getting Started
 
