@@ -189,12 +189,46 @@ curl -X POST http://localhost:5000/api/projects \
   -b cookies.txt
 ```
 
+### Password Reset
+
+Reset and verification tokens are only ever delivered by email. The sample's
+`LoggingEmailSender` writes those emails to the console, so copy the token from the log.
+
+```bash
+# 1) Request a reset link (same response whether or not the account exists)
+curl -X POST http://localhost:5000/api/auth/password-reset/send-token \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com"}'
+
+# 2) Redeem the token from the console log — no session needed
+curl -X POST http://localhost:5000/api/auth/password-reset/reset \
+  -H "Content-Type: application/json" \
+  -d '{"token":"<token-from-log>","newPassword":"NewPassword123!"}'
+```
+
+### Email Verification
+
+Sign-up sends a verification email (`EmailVerification.SendOnSignUp = true`).
+
+```bash
+# Resend (signed-in users can omit the email; the session's user is used)
+curl -X POST http://localhost:5000/api/auth/email-verify/send-token \
+  -H "Content-Type: application/json" \
+  -d '{"email":"new-user@example.com"}'
+
+# Verify with the token from the console log
+curl -X POST http://localhost:5000/api/auth/email-verify/verify \
+  -H "Content-Type: application/json" \
+  -d '{"token":"<token-from-log>"}'
+```
+
 ## Configuration
 
 The Aegis.Auth configuration and endpoint mapping are in `Program.cs`:
 
 - **Secret**: Used for signing cookies and tokens
 - **Email/Password**: Enabled with verification optional for testing
+- **Email delivery**: `LoggingEmailSender` logs reset/verification emails to the console
 - **Session**: 1-hour expiration with 5-minute cookie cache
 - **Cookie Cache**: Enabled to reduce database lookups
 - **Database**: SQLite (`ConnectionStrings:DefaultConnection`)

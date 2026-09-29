@@ -1,5 +1,6 @@
 using Aegis.Auth.Constants;
 using Aegis.Auth.Entities;
+using Aegis.Auth.Features.EmailVerification;
 using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Features.SignIn;
 using Aegis.Auth.Tests.Helpers;
@@ -17,17 +18,20 @@ public sealed class SignInServiceTests : IDisposable
 {
     private readonly ServiceTestFixture _fixture;
     private readonly Mock<ISessionService> _sessionMock;
+    private readonly Mock<IEmailVerificationService> _emailVerificationMock;
     private readonly SignInService _sut;
 
     public SignInServiceTests()
     {
         _fixture = new ServiceTestFixture();
         _sessionMock = new Mock<ISessionService>(MockBehavior.Strict);
+        _emailVerificationMock = new Mock<IEmailVerificationService>(MockBehavior.Strict);
         _sut = new SignInService(
             Microsoft.Extensions.Options.Options.Create(_fixture.Options),
             _fixture.LoggerFactory,
             _fixture.DbContext,
-            _sessionMock.Object);
+            _sessionMock.Object,
+            _emailVerificationMock.Object);
     }
 
     public void Dispose() => _fixture.Dispose();
@@ -403,5 +407,87 @@ public sealed class SignInServiceTests : IDisposable
         _sessionMock
             .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<Session>.Success(CreateMockSession()));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // EMAIL VERIFICATION GATE
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private void RequireVerification(bool? sendOnSignIn = null)
+    {
+        _fixture.Options.EmailAndPassword.RequireEmailVerification = true;
+        _fixture.Options.EmailVerification.SendOnSignIn = sendOnSignIn;
+        _fixture.Options.EmailVerification.SendVerificationEmail = (_, _) => Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task SignInEmail_RequireVerification_UnverifiedUser_BlockedAndEmailSent()
+    {
+        RequireVerification();
+        await _fixture.SeedUserAsync();
+        _emailVerificationMock
+            .Setup(s => s.SendVerificationEmailAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput());
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AuthErrors.Identity.EmailNotVerified, result.ErrorCode);
+        _emailVerificationMock.Verify(s => s.SendVerificationEmailAsync(It.Is<User>(u => u.Email == "existing@test.com"), It.IsAny<CancellationToken>()), Times.Once);
+        _sessionMock.Verify(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SignInEmail_RequireVerification_SendOnSignInFalse_BlockedWithoutEmail()
+    {
+        RequireVerification(sendOnSignIn: false);
+        await _fixture.SeedUserAsync();
+
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput());
+
+        Assert.Equal(AuthErrors.Identity.EmailNotVerified, result.ErrorCode);
+        _emailVerificationMock.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task SignInEmail_RequireVerification_WrongPassword_DoesNotRevealVerificationState()
+    {
+        RequireVerification();
+        await _fixture.SeedUserAsync();
+
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput(password: "WrongPassword!"));
+
+        Assert.Equal(AuthErrors.Identity.InvalidEmailOrPassword, result.ErrorCode);
+        _emailVerificationMock.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task SignInEmail_RequireVerification_VerifiedUser_SignsIn()
+    {
+        RequireVerification();
+        var (user, _) = await _fixture.SeedUserAsync();
+        user.EmailVerified = true;
+        await _fixture.DbContext.SaveChangesAsync();
+        _sessionMock
+            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<Session>.Success(CreateMockSession()));
+
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput());
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task SignInEmail_VerificationNotRequired_UnverifiedUserSignsIn()
+    {
+        await _fixture.SeedUserAsync();
+        _sessionMock
+            .Setup(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<Session>.Success(CreateMockSession()));
+
+        Result<SignInResult> result = await _sut.SignInEmail(ValidInput());
+
+        Assert.True(result.IsSuccess);
+        _emailVerificationMock.VerifyNoOtherCalls();
     }
 }

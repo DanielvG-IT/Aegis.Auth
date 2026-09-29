@@ -1,3 +1,5 @@
+using Aegis.Auth.Entities;
+
 namespace Aegis.Auth.Options
 {
     public sealed class EmailAndPasswordOptions
@@ -8,22 +10,48 @@ namespace Aegis.Auth.Options
 
         public bool AutoSignIn { get; set; } = true;
 
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // EMAIL VERIFICATION - DISABLED FOR v0.1, WILL BE RE-ENABLED IN v0.2
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // TODO v0.2: Uncomment these properties for email verification support
-        // public bool RequireEmailVerification { get; set; } = false;
-        // public Func<string, Task<string>>? SendVerificationEmail { get; set; }
-        // ═══════════════════════════════════════════════════════════════════════════════
+        /// <summary>
+        /// When true, users with an unverified email cannot sign in with email and password,
+        /// and sign-up does not auto sign in. Requires <see cref="EmailVerificationOptions.SendVerificationEmail"/>.
+        /// </summary>
+        public bool RequireEmailVerification { get; set; } = false;
 
         public int MinPasswordLength { get; set; } = 8;
         public int MaxPasswordLength { get; set; } = 128;
 
-        // public bool RevokeSessionsOnPasswordReset { get; set; }
-        // public int ResetPasswordTokenExpiresIn { get; set; } = 3600;
-        // public Func<ResetPasswordContext, Task>? SendResetPassword { get; set; }
-        // public Func<User, HttpContext?, Task>? OnPasswordReset { get; set; }
+        /// <summary>
+        /// Delivers the password reset token to the user (typically by email). The raw token is
+        /// only ever passed to this delegate; it never appears in an HTTP response.
+        /// Password reset endpoints are mapped only when this is configured.
+        /// Prefer enqueuing the email over sending it inline: the delegate only runs for existing
+        /// accounts, so a slow send makes response times reveal which emails are registered.
+        /// </summary>
+        public Func<SendResetPasswordContext, CancellationToken, Task>? SendResetPassword { get; set; }
 
+        /// <summary>
+        /// Lifetime of a password reset token in seconds. Defaults to 30 minutes.
+        /// </summary>
+        public int ResetPasswordTokenExpiresIn { get; set; } = 60 * 30;
+
+        /// <summary>
+        /// When true, all sessions of the user are revoked after a successful password reset.
+        /// </summary>
+        public bool RevokeSessionsOnPasswordReset { get; set; } = true;
+    }
+
+    public sealed class SendResetPasswordContext
+    {
+        public required User User { get; init; }
+
+        /// <summary>
+        /// The raw, single-use reset token. Build your reset link with it; never log it.
+        /// </summary>
+        public required string Token { get; init; }
+
+        /// <summary>
+        /// Request-scoped services, so the delegate can resolve your email sender.
+        /// </summary>
+        public required IServiceProvider Services { get; init; }
     }
 
     // TODO Maybe remove BCrypt dependency
@@ -64,11 +92,4 @@ namespace Aegis.Auth.Options
         public static PasswordValidationResult Invalid(string errorMessage) =>
             new() { IsValid = false, ErrorMessage = errorMessage };
     }
-
-    // public sealed class ResetPasswordContext
-    // {
-    //     public required User User { get; init; }
-    //     public required string Url { get; init; }
-    //     public required string Token { get; init; }
-    // }
 }

@@ -1,6 +1,7 @@
 using Aegis.Auth.Abstractions;
 using Aegis.Auth.Constants;
 using Aegis.Auth.Entities;
+using Aegis.Auth.Features.EmailVerification;
 using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Logging;
 using Aegis.Auth.Options;
@@ -18,9 +19,10 @@ namespace Aegis.Auth.Features.SignIn
         Task<Result<SignInResult>> SignInEmail(SignInEmailInput input, CancellationToken cancellationToken = default);
     }
 
-    internal sealed class SignInService(IOptions<AegisAuthOptions> optionsAccessor, ILoggerFactory loggerFactory, IAuthDbContext dbContext, ISessionService sessionService) : ISignInService
+    internal sealed class SignInService(IOptions<AegisAuthOptions> optionsAccessor, ILoggerFactory loggerFactory, IAuthDbContext dbContext, ISessionService sessionService, IEmailVerificationService emailVerificationService) : ISignInService
     {
         private readonly ISessionService _sessionService = sessionService;
+        private readonly IEmailVerificationService _emailVerificationService = emailVerificationService;
         private readonly AegisAuthOptions _options = optionsAccessor.Value;
         private readonly IAuthDbContext _db = dbContext;
         private readonly ILogger _logger = loggerFactory.CreateLogger<SignInService>();
@@ -99,46 +101,35 @@ namespace Aegis.Auth.Features.SignIn
 
             //* ATM User exists, has password and has typed in a valid password!
 
-            // ═══════════════════════════════════════════════════════════════════════════════
-            // EMAIL VERIFICATION - DISABLED FOR v0.1, WILL BE RE-ENABLED IN v0.2
-            // ═══════════════════════════════════════════════════════════════════════════════
-            // TODO v0.2: Uncomment this entire block for email verification support
-            /*
-            if (_options.EmailAndPassword.RequireEmailVerification && !user.EmailVerified)
+            if (_options.EmailAndPassword.RequireEmailVerification && user.EmailVerified is false)
             {
                 _logger.SignInEmailNotVerified(user.Id);
 
                 // If we can't send emails, we just dead-end here.
-                if (_options.EmailVerification?.SendVerificationEmail is null)
+                if (_options.EmailVerification.SendVerificationEmail is null)
                 {
                     _logger.SignInEmailVerificationNotConfigured(user.Id);
                     return Result<SignInResult>.Failure(AuthErrors.Identity.EmailNotVerified, "Email is not verified.");
                 }
 
-                var sendOnSignIn = _options.EmailVerification.SendOnSignIn;
-                var requireEmailVer = _options.EmailAndPassword.RequireEmailVerification;
-
-                // Logic: Send if explicitly true, OR if null but verification is required globally
-                if (sendOnSignIn == true || (sendOnSignIn is null && requireEmailVer == true))
+                // Only reached while RequireEmailVerification is on, so null means "send".
+                if (_options.EmailVerification.SendOnSignIn ?? true)
                 {
                     _logger.SignInSendingVerificationEmail(user.Id);
-                    // TODO: Create verify token here
-                    var token = string.Empty;
-                    var url = string.Empty;
-
-                    var verificationContext = new SendVerificationEmailContext { Token = token, User = user, Url = url, CallbackUri = input.Callback };
-                    await _options.EmailVerification.SendVerificationEmail(verificationContext);
-
-                    _logger.SignInVerificationEmailSent(user.Id);
-                    return Result<SignInResult>.Failure(AuthErrors.Identity.EmailNotVerified, "Verification email sent. Please check your inbox.");
+                    Result sent = await _emailVerificationService.SendVerificationEmailAsync(user, cancellationToken);
+                    if (sent.IsSuccess)
+                    {
+                        _logger.SignInVerificationEmailSent(user.Id);
+                        return Result<SignInResult>.Failure(AuthErrors.Identity.EmailNotVerified, "Email is not verified. A verification email has been sent.");
+                    }
+                }
+                else
+                {
+                    _logger.SignInVerificationDisabled(user.Id);
                 }
 
-                // They are blocked, but we didn't send a new email because of config settings
-                _logger.SignInVerificationDisabled(user.Id);
                 return Result<SignInResult>.Failure(AuthErrors.Identity.EmailNotVerified, "Email is not verified.");
             }
-            */
-            // ═══════════════════════════════════════════════════════════════════════════════
 
             //* User exists and is all correct state to finalize login
 

@@ -1,3 +1,5 @@
+using Aegis.Auth.Http.Features.EmailVerification;
+using Aegis.Auth.Http.Features.PasswordReset;
 using Aegis.Auth.Http.Features.SignIn;
 using Aegis.Auth.Http.Features.SignOut;
 using Aegis.Auth.Http.Features.SignUp;
@@ -21,6 +23,8 @@ public sealed class AegisAuthEndpointMapOptions
     public bool MapEmailSignIn { get; set; } = true;
     public bool MapEmailSignUp { get; set; } = true;
     public bool MapOAuthSignIn { get; set; } = true;
+    public bool MapPasswordReset { get; set; } = true;
+    public bool MapEmailVerification { get; set; } = true;
 
     // true: derive defaults from AegisAuthOptions feature flags.
     // false: map strictly by Map* toggles above.
@@ -60,14 +64,11 @@ public static class AegisAuthEndpointRouteBuilderExtensions
             }
         }
 
-        var canMapEmail = mapOptions.MapEmailSignIn || mapOptions.MapEmailSignUp;
-        if (canMapEmail)
-        {
-            if (mapOptions.RespectConfiguration && authOptions.EmailAndPassword.Enabled is false)
-            {
-                return endpoints;
-            }
+        var emailAndPasswordEnabled = mapOptions.RespectConfiguration is false || authOptions.EmailAndPassword.Enabled;
 
+        var canMapEmail = mapOptions.MapEmailSignIn || mapOptions.MapEmailSignUp;
+        if (canMapEmail && emailAndPasswordEnabled)
+        {
             if (mapOptions.MapEmailSignIn)
             {
                 group.MapSignInEmail();
@@ -83,6 +84,29 @@ public static class AegisAuthEndpointRouteBuilderExtensions
             {
                 group.MapSignUpEmail();
             }
+        }
+
+        // Token endpoints are only useful when the app can deliver the token.
+        var canMapPasswordReset = mapOptions.MapPasswordReset && emailAndPasswordEnabled;
+        if (mapOptions.RespectConfiguration)
+        {
+            canMapPasswordReset = canMapPasswordReset && authOptions.EmailAndPassword.SendResetPassword is not null;
+        }
+
+        if (canMapPasswordReset)
+        {
+            group.MapPasswordReset();
+        }
+
+        var canMapEmailVerification = mapOptions.MapEmailVerification;
+        if (mapOptions.RespectConfiguration)
+        {
+            canMapEmailVerification = canMapEmailVerification && authOptions.EmailVerification.SendVerificationEmail is not null;
+        }
+
+        if (canMapEmailVerification)
+        {
+            group.MapEmailVerification();
         }
 
         return endpoints;

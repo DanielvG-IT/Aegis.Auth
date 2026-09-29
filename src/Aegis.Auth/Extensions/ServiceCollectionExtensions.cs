@@ -137,6 +137,7 @@ namespace Aegis.Auth.Extensions
                     errors.Add("AegisAuthOptions.EmailAndPassword.MaxPasswordLength must be greater than or equal to MinPasswordLength.");
                 }
 
+                ValidateEmailDeliveryOptions(options, errors);
                 ValidateOAuthProviderOptions(options, errors);
 
                 if (options.Session.ExpiresIn < 0)
@@ -163,6 +164,33 @@ namespace Aegis.Auth.Extensions
                 }
 
                 return errors.Count > 0 ? ValidateOptionsResult.Fail(errors) : ValidateOptionsResult.Success;
+            }
+
+            private static void ValidateEmailDeliveryOptions(AegisAuthOptions options, List<string> errors)
+            {
+                EmailVerificationOptions verification = options.EmailVerification;
+                if (verification.SendVerificationEmail is null)
+                {
+                    if (options.EmailAndPassword.RequireEmailVerification)
+                    {
+                        errors.Add("AegisAuthOptions.EmailVerification.SendVerificationEmail must be configured when EmailAndPassword.RequireEmailVerification is enabled.");
+                    }
+
+                    if (verification.SendOnSignUp is true || verification.SendOnSignIn is true)
+                    {
+                        errors.Add("AegisAuthOptions.EmailVerification.SendVerificationEmail must be configured when SendOnSignUp or SendOnSignIn is enabled.");
+                    }
+                }
+
+                if (verification.ExpiresIn <= 0)
+                {
+                    errors.Add("AegisAuthOptions.EmailVerification.ExpiresIn must be greater than 0.");
+                }
+
+                if (options.EmailAndPassword.ResetPasswordTokenExpiresIn <= 0)
+                {
+                    errors.Add("AegisAuthOptions.EmailAndPassword.ResetPasswordTokenExpiresIn must be greater than 0.");
+                }
             }
 
             private static void ValidateOAuthProviderOptions(AegisAuthOptions options, List<string> errors)
