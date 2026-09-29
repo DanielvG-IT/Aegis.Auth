@@ -44,6 +44,14 @@ namespace Aegis.Auth.Options
         public string CallbackPath { get; set; } = string.Empty;
         public string[] Scopes { get; set; } = [];
         public bool SaveTokens { get; set; } = true;
+
+        /// <summary>
+        /// Sends a PKCE (RFC 7636, S256) code challenge with the authorization request and the
+        /// matching verifier with the token request, protecting against authorization code
+        /// interception. Enabled by default; a startup warning is logged when an enabled
+        /// provider turns it off.
+        /// </summary>
+        public bool UsePkce { get; set; } = true;
     }
 
     public sealed class GoogleOAuthOptions : OAuthProviderOptions
@@ -75,6 +83,13 @@ namespace Aegis.Auth.Options
         }
     }
 
+    /// <remarks>
+    /// Apple's Sign in with Apple REST API does not document PKCE support. Aegis still sends the
+    /// S256 challenge and verifier by default; the flow does not depend on Apple enforcing them,
+    /// and it is protected by the state parameter and the client secret JWT either way. Set
+    /// <see cref="OAuthProviderOptions.UsePkce"/> to false only if Apple starts rejecting the
+    /// extra parameters for your configuration.
+    /// </remarks>
     public sealed class AppleOAuthOptions : OAuthProviderOptions
     {
         public string ResponseMode { get; set; } = "form_post";

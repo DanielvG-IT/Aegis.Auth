@@ -30,7 +30,8 @@ internal sealed class AegisTestHost : IAsyncDisposable
 
     public static async Task<AegisTestHost> StartAsync(
         Action<AegisAuthOptions>? configure = null,
-        Action<AegisAuthEndpointMapOptions>? configureEndpoints = null)
+        Action<AegisAuthEndpointMapOptions>? configureEndpoints = null,
+        Action<IServiceCollection>? configureServices = null)
     {
         WebApplicationBuilder builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
@@ -53,6 +54,8 @@ internal sealed class AegisTestHost : IAsyncDisposable
             };
             configure?.Invoke(options);
         });
+
+        configureServices?.Invoke(builder.Services);
 
         WebApplication app = builder.Build();
         app.UseAuthentication();

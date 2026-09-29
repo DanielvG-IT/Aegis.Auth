@@ -26,7 +26,7 @@ This is v0.1 — actively developed. The feature set below reflects what is **ac
 - Password reset (token-only, no session required)
 - CSRF protection
 - Rate limiting / brute-force protection
-- OAuth (Google, GitHub, Microsoft, Apple) with account linking
+- OAuth (Google, GitHub, Microsoft, Apple) with account linking and PKCE (S256) by default
 
 ### Planned
 

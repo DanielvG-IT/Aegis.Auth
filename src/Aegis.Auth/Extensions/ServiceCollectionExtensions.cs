@@ -98,6 +98,7 @@ namespace Aegis.Auth.Extensions
             services.AddScoped<IPasswordResetService, PasswordResetService>();
             services.AddScoped<ITokenEncryptionService, TokenEncryptionService>();
             services.AddSingleton<IRateLimitService, RateLimitService>();
+            services.AddHostedService<OAuthStartupDiagnostics>();
 
             return services;
         }
@@ -441,7 +442,7 @@ namespace Aegis.Auth.Extensions
             options.ClientSecret = providerOptions.ClientSecret;
             options.CallbackPath = providerOptions.CallbackPath;
             options.SaveTokens = providerOptions.SaveTokens;
-            options.UsePkce = true;
+            options.UsePkce = providerOptions.UsePkce;
             options.Scope.Clear();
             options.ClaimActions.Clear();
 

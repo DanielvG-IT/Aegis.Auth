@@ -367,5 +367,15 @@ namespace Aegis.Auth.Logging
             Level = LogLevel.Information,
             Message = "Email verified for user {UserId}")]
         internal static partial void EmailVerificationSuccessful(this ILogger logger, string userId);
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // OAuth Configuration Messages
+        // ═══════════════════════════════════════════════════════════════════════════════
+
+        [LoggerMessage(
+            EventId = 7000,
+            Level = LogLevel.Warning,
+            Message = "PKCE is disabled for the {Provider} OAuth provider. Authorization codes are not bound to this client; enable UsePkce unless the provider rejects it")]
+        internal static partial void OAuthPkceDisabled(this ILogger logger, string provider);
     }
 }
