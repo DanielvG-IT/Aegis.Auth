@@ -49,4 +49,18 @@ public sealed class OAuthSchemeRegistrationTests
 
         Assert.Null(await schemes.GetSchemeAsync(AegisAuthSchemes.Google));
     }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("?rememberMe=false")]
+    public async Task OAuthChallenge_RememberMeQueryIsOptional(string query)
+    {
+        await using AegisTestHost host = await AegisTestHost.StartAsync(o =>
+            o.OAuth.AddGoogle("google-client-id", "google-client-secret"));
+
+        HttpResponseMessage response = await host.Client.GetAsync($"/api/auth/sign-in/oauth/google{query}");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.StartsWith("https://accounts.google.com/", response.Headers.Location!.ToString());
+    }
 }
