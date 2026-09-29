@@ -28,7 +28,7 @@ The SDK version is pinned in `global.json`. Sample migrations:
 - **Services** are `internal sealed` classes behind a public interface and return `Result` / `Result<T>` with a code from `AuthErrors`. Expected failures are results, not exceptions.
 - **Endpoints** are `internal static Map…(this RouteGroupBuilder group)` methods, registered in `MapAegisAuthEndpoints`, gated by `AegisAuthEndpointMapOptions` (and `RespectConfiguration`). Failures go through `AegisHttpResultMapper`, so the client always gets ProblemDetails with the error code. Give new error codes an HTTP status there.
 - **Options** are plain classes in `Options/`. New features are **off by default**. Invalid combinations fail at startup with a clear message (see the `Validate…` methods in `ServiceCollectionExtensions`).
-- **Logging** uses source-generated `[LoggerMessage]` methods in `Logging/LogMessages.cs`, one EventId range per feature: 1000 sign-in, 2000 sign-up, 3000 sessions, 4000 sign-out, 5000 password reset, 6000 email verification, 7000 OAuth, 8000 rate limiting. New features take the next free thousand.
+- **Logging** uses source-generated `[LoggerMessage]` methods in `Logging/LogMessages.cs`, one EventId range per feature: 1000 sign-in, 2000 sign-up, 3000 sessions, 4000 sign-out, 5000 password reset, 6000 email verification, 7000 OAuth, 8000 rate limiting, 9000 secondary storage. New features take the next free thousand.
 - **Style** follows `.editorconfig`; `dotnet format` enforces it. Match the surrounding code.
 
 ## Security rules (non-negotiable)

@@ -14,6 +14,7 @@ public class SampleAuthDbContext(DbContextOptions<SampleAuthDbContext> options, 
     public DbSet<Account> Accounts { get; set; } = null!;
     public DbSet<Session> Sessions { get; set; } = null!;
     public DbSet<AuthToken> AuthTokens { get; set; } = null!;
+    public DbSet<AegisKeyValue> AegisKeyValues { get; set; } = null!;
     public DbSet<Project> Projects { get; set; } = null!;
     public DbSet<ProjectTask> ProjectTasks { get; set; } = null!;
 

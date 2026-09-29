@@ -11,6 +11,12 @@ namespace Aegis.Auth.Abstractions
         DbSet<Session> Sessions { get; }
         DbSet<AuthToken> AuthTokens { get; }
 
+        /// <summary>
+        /// Entries of the database-backed secondary storage (<c>AddAegisDatabaseSecondaryStorage()</c>).
+        /// Mapped by <c>ApplyAegisAuthModel</c>; the table is unused with the other storage implementations.
+        /// </summary>
+        DbSet<AegisKeyValue> AegisKeyValues { get; }
+
         Task<int> SaveChangesAsync(CancellationToken ct = default);
     }
 }
