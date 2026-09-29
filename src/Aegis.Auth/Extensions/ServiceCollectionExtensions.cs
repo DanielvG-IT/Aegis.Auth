@@ -23,6 +23,7 @@ using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
@@ -69,6 +70,7 @@ namespace Aegis.Auth.Extensions
                 .AddAegisAuth()
                 .AddCookie(AegisAuthSchemes.ExternalCookie)
                 .AddExternalOAuthProviders();
+            services.Replace(ServiceDescriptor.Singleton<IAuthenticationSchemeProvider, AegisAuthenticationSchemeProvider>());
 
             services.AddAuthorization();
             services.AddDataProtection();
