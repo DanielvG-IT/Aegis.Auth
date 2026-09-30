@@ -167,6 +167,37 @@ options.RateLimit.MaxAttemptsPerEmailPer15Minutes = 5; // sign-in attempts per e
 - Behind a reverse proxy, configure [forwarded headers](https://learn.microsoft.com/aspnet/core/host-and-deploy/proxy-load-balancer) so each client is seen with its own IP instead of the proxy's.
 - Counters live in memory per application instance, so with several instances each enforces the limits separately.
 
+## Benchmarks
+
+`benchmarks/Aegis.Auth.Benchmarks` measures the hot paths with [BenchmarkDotNet](https://benchmarkdotnet.org). It builds with the solution but never runs in CI's build and test jobs.
+
+```bash
+# Everything, SQLite only (no Docker needed)
+dotnet run -c Release --project benchmarks/Aegis.Auth.Benchmarks -- --filter '*'
+
+# Add PostgreSQL: starts postgres:17-alpine through Testcontainers (needs Docker)
+dotnet run -c Release --project benchmarks/Aegis.Auth.Benchmarks -- --postgres --filter '*'
+
+# Use an existing PostgreSQL server instead; the benchmarks create and drop their own databases
+AEGIS_BENCH_POSTGRES="Host=localhost;Username=postgres;Password=postgres" \
+  dotnet run -c Release --project benchmarks/Aegis.Auth.Benchmarks -- --filter '*'
+
+# One group, or list what exists
+dotnet run -c Release --project benchmarks/Aegis.Auth.Benchmarks -- --filter '*Queries*'
+dotnet run -c Release --project benchmarks/Aegis.Auth.Benchmarks -- --list flat
+```
+
+Any other argument goes to BenchmarkDotNet (`--job short` for a quicker, noisier pass). Results, including GitHub-flavoured Markdown tables, land in `BenchmarkDotNet.Artifacts/results/`.
+
+| Group | Benchmarks |
+|---|---|
+| Crypto | `SessionTokenHashBenchmark` (SHA-256 token hash, token generation), `CookieSignBenchmark` (HMAC sign/verify), `CookieCacheEncryptBenchmark` (AES-256-GCM vs compact `session_data`), `PasswordHashBenchmark` (BCrypt work factor 10/11/12/14) |
+| Session | `SessionValidationBenchmark`: one request through `AegisAuthenticationHandler` with a cookie-cache hit (compact, encrypted), a database lookup, and a secondary-storage (`IDistributedCache`) lookup |
+| Sign-in | `SignInBenchmark`: `SignInEmail` end to end (lookup, BCrypt verify, session insert), plus wrong-password and unknown-email timings |
+| Queries | `SessionByTokenHashBenchmark`, `UserByEmailBenchmark`, `TokenConsumeBenchmark`: EF Core tracked vs `AsNoTracking` vs compiled query (with and without a pooled context) vs Dapper |
+
+Database benchmarks seed 10,000 users (each with an account, a session and a verification token) and run once per provider. Every variant is checked to return the same row before it is measured. Compare numbers only within one run on one machine; a laptop and a CI runner differ far more than most of the variants do.
+
 ## Project structure
 
 ```
@@ -176,6 +207,9 @@ src/
 
 tests/
   Aegis.Auth.Tests/    — xUnit tests
+
+benchmarks/
+  Aegis.Auth.Benchmarks/ — BenchmarkDotNet suite (see Benchmarks)
 
 samples/
   Aegis.Auth.Sample/

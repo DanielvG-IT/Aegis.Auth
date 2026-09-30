@@ -11,6 +11,7 @@ The roadmap lives in [#86](https://github.com/DanielvG-IT/Aegis.Auth/issues/86);
 | `src/Aegis.Auth.Http` | Minimal-API endpoints (`Features/<Feature>/*Endpoints.cs`), endpoint mapping (`Extensions/AegisAuthEndpointRouteBuilderExtensions.cs`), error → ProblemDetails mapping (`Internal/AegisHttpResultMapper.cs`) |
 | `tests/Aegis.Auth.Tests` | xUnit. Service tests use strict Moq mocks + EF InMemory (`Helpers/TestDbContext.cs`); HTTP tests use `Http/AegisTestHost.cs` (TestServer) |
 | `samples/Aegis.Auth.Sample` | SQLite sample app with EF migrations |
+| `benchmarks/Aegis.Auth.Benchmarks` | BenchmarkDotNet suite (crypto, session validation, sign-in, EF vs Dapper hot queries on SQLite and PostgreSQL). Built by CI, never run by it; see the README's "Benchmarks" section |
 
 ## Commands (mirror CI)
 

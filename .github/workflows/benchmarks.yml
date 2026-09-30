@@ -1,0 +1,87 @@
+# ════════════════════════════════════════════════════════════════════════════════
+# Benchmarks — optional, informational, never blocks a merge
+# Runs only on demand: manually, or when a PR gets the "run-benchmarks" label.
+# Shared runners are noisy, so treat these numbers as a smoke test, not a baseline.
+# The regression gate (fail on >20% vs baseline) is phase 2 of #67.
+# ════════════════════════════════════════════════════════════════════════════════
+name: Benchmarks
+
+on:
+  workflow_dispatch:
+    inputs:
+      filter:
+        description: "BenchmarkDotNet --filter glob"
+        default: "*"
+        required: true
+      job:
+        description: "BenchmarkDotNet job (short, medium, default)"
+        default: "short"
+        required: true
+  pull_request:
+    types: [labeled]
+
+concurrency:
+  group: benchmarks-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  benchmarks:
+    name: Run benchmarks
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'run-benchmarks'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Run (SQLite + PostgreSQL via Testcontainers)
+        env:
+          FILTER: ${{ inputs.filter || '*' }}
+          JOB: ${{ inputs.job || 'short' }}
+        run: >
+          dotnet run -c Release --project benchmarks/Aegis.Auth.Benchmarks
+          -- --postgres --filter "$FILTER" --job "$JOB"
+          --artifacts ./BenchmarkDotNet.Artifacts
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmark-results
+          path: ./BenchmarkDotNet.Artifacts/results
+          retention-days: 30
+
+      - name: Comment results on the PR
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo "### Benchmark results (\`${{ github.sha }}\`, ${{ runner.os }}, short job)"
+            echo
+            echo "Shared runner: compare rows within this run only."
+            for report in ./BenchmarkDotNet.Artifacts/results/*-report-github.md; do
+              echo
+              echo "#### $(basename "$report" -report-github.md)"
+              echo
+              # Drop the environment preamble BenchmarkDotNet prints above each table.
+              sed -n '/^|/,$p' "$report"
+            done
+          } > comment.md
+          # GitHub rejects comments over 65536 characters.
+          head -c 60000 comment.md > comment-trimmed.md
+          gh pr comment "$PR_NUMBER" --repo "${{ github.repository }}" --body-file comment-trimmed.md
