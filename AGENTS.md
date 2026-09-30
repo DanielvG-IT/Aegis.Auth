@@ -3,6 +3,10 @@
 Guide for coding agents (and humans) working on Aegis.Auth. Read this before picking up an issue.
 The roadmap lives in [#86](https://github.com/DanielvG-IT/Aegis.Auth/issues/86); every roadmap issue links to its epic and dependencies.
 
+## Branches
+
+`canary` is the integration branch: branch from the latest `origin/canary` and open every PR against `canary` (never `main`). Before merging, merge the current `canary` into your branch and rerun the commands below. Other sessions merge in parallel. Open work and a dependency-ordered queue live in [`docs/agent-handoff.md`](docs/agent-handoff.md).
+
 ## Repository map
 
 | Path | What lives there |
