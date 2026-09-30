@@ -1,0 +1,36 @@
+{
+  "realm": "aegis-saml-poc",
+  "enabled": true,
+  "users": [
+    {
+      "username": "alice",
+      "enabled": true,
+      "email": "alice@example.test",
+      "emailVerified": true,
+      "firstName": "Alice",
+      "lastName": "Example",
+      "credentials": [{ "type": "password", "value": "alice-password", "temporary": false }]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "https://sp.aegis.test/saml/tenant-kc",
+      "protocol": "saml",
+      "enabled": true,
+      "frontchannelLogout": true,
+      "redirectUris": ["https://sp.aegis.test/saml/tenant-kc/*"],
+      "attributes": {
+        "saml_assertion_consumer_url_post": "https://sp.aegis.test/saml/tenant-kc/acs",
+        "saml.force.post.binding": "true",
+        "saml.server.signature": "true",
+        "saml.assertion.signature": "true",
+        "saml.client.signature": "false",
+        "saml.signature.algorithm": "RSA_SHA256",
+        "saml_signature_canonicalization_method": "http://www.w3.org/2001/10/xml-exc-c14n#",
+        "saml.authnstatement": "true",
+        "saml_force_name_id_format": "true",
+        "saml_name_id_format": "email"
+      }
+    }
+  ]
+}
