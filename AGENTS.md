@@ -8,6 +8,7 @@ The roadmap lives in [#86](https://github.com/DanielvG-IT/Aegis.Auth/issues/86);
 | Path | What lives there |
 |---|---|
 | `src/Aegis.Auth` | Core: entities (`Entities/`), options (`Options/`), one folder per feature with its service (`Features/<Feature>/`), EF model (`Extensions/ModelBuilderExtensions.cs`), DI + startup validation (`Extensions/ServiceCollectionExtensions.cs`), crypto (`Core/Crypto/`), error codes (`Constants/ErrorCodes.cs`), log messages (`Logging/LogMessages.cs`), plugin contract (`Plugins/`), EF model integration for plugins (`Infrastructure/EntityFramework/`) |
+| `src/Aegis.Auth.Organizations` | Organizations plugin (`AddOrganizations`): entities, `OrganizationService`, endpoints under `/organization` |
 | `src/Aegis.Auth.Http` | Minimal-API endpoints (`Features/<Feature>/*Endpoints.cs`), endpoint mapping (`Extensions/AegisAuthEndpointRouteBuilderExtensions.cs`), error → ProblemDetails mapping (`Internal/AegisHttpResultMapper.cs`, which delegates to `Plugins/AegisResults.cs` in core) |
 | `tests/Aegis.Auth.Tests` | xUnit. Service tests use strict Moq mocks + EF InMemory or SQLite in-memory (`Helpers/ServiceTestFixture.cs`, `Helpers/TestDbContext.cs`); HTTP tests use `Http/AegisTestHost.cs` (TestServer on SQLite) |
 | `samples/Aegis.Auth.Sample` | SQLite sample app with EF migrations |
@@ -28,7 +29,7 @@ The SDK version is pinned in `global.json`. Sample migrations:
 - **Services** are `internal sealed` classes behind a public interface and return `Result` / `Result<T>` with a code from `AuthErrors`. Expected failures are results, not exceptions.
 - **Endpoints** are `internal static Map…(this RouteGroupBuilder group)` methods, registered in `MapAegisAuthEndpoints`, gated by `AegisAuthEndpointMapOptions` (and `RespectConfiguration`). Failures go through `AegisHttpResultMapper` (core and plugin endpoints use `AegisResults.Problem`), so the client always gets ProblemDetails with the error code. Give new core error codes an HTTP status in `AegisPluginRegistry.CoreErrorStatusCodes`; plugins declare theirs in `ErrorStatusCodes`.
 - **Options** are plain classes in `Options/`. New features are **off by default**. Invalid combinations fail at startup with a clear message (see the `Validate…` methods in `ServiceCollectionExtensions`).
-- **Logging** uses source-generated `[LoggerMessage]` methods in `Logging/LogMessages.cs`, one EventId range per feature: 1000 sign-in, 2000 sign-up, 3000 sessions, 4000 sign-out, 5000 password reset, 6000 email verification, 7000 OAuth, 8000 rate limiting, 9000 secondary storage. New features take the next free thousand.
+- **Logging** uses source-generated `[LoggerMessage]` methods in `Logging/LogMessages.cs`, one EventId range per feature: 1000 sign-in, 2000 sign-up, 3000 sessions, 4000 sign-out, 5000 password reset, 6000 email verification, 7000 OAuth, 8000 rate limiting, 9000 secondary storage, 10000 organizations. New features take the next free thousand.
 - **Style** follows `.editorconfig`; `dotnet format` enforces it. Match the surrounding code.
 
 ## Security rules (non-negotiable)

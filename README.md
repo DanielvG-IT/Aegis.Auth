@@ -29,6 +29,7 @@ This is v0.1 — actively developed. The feature set below reflects what is **ac
 - OAuth (Google, GitHub, Microsoft, Apple) with account linking and PKCE (S256) by default
 - Rate limiting per client IP and per email (see [Rate limiting](#rate-limiting))
 - Secondary storage (`IAegisSecondaryStorage`): short-lived key/value state with TTL, atomic increments and set-if-not-exists; in-memory, database or `IDistributedCache` backed (see [Secondary storage](#secondary-storage))
+- Organizations (`Aegis.Auth.Organizations`): organizations, members, owner/admin/member roles with permissions, the active organization per session, and `RequireOrganizationPermission` for your own endpoints (see [Organizations](#organizations))
 - Plugin contract: features contribute services, EF model, endpoints, error codes, rate-limit rules and startup validation (see [Plugins](#plugins)). Email verification is built on it.
 
 ### Known gaps
@@ -196,6 +197,62 @@ Writing a plugin is described in [`AGENTS.md`](AGENTS.md#writing-a-plugin).
 > against the old signature must be rebuilt.
 >
 > `AegisAuthContext` has a new required `SessionId`. Code that constructs it itself (e.g. in tests) must set it.
+
+## Organizations
+
+The `Aegis.Auth.Organizations` package is a plugin that adds organizations, members and roles.
+
+```csharp
+builder.Services.AddDbContext<AppDbContext>((sp, o) => o.UseSqlite(cs).UseAegisAuth(sp));
+builder.Services.AddAegisAuth<AppDbContext>(options => { /* ... */ })
+    .AddOrganizations(o =>
+    {
+        o.OrganizationLimit = 5;          // organizations per user
+        o.MembershipLimit = 100;          // members per organization
+        o.AllowUserToCreateOrganization = user => Task.FromResult(true);
+        o.Roles["admin"].Permissions.Add("project:create"); // your own permissions
+    });
+```
+
+It adds the `Organizations` and `OrganizationMembers` tables and a `Session.ActiveOrganizationId` column, so add a migration.
+
+| Option | Default | Notes |
+|---|---|---|
+| `OrganizationLimit` | 5 | Organizations a user can belong to |
+| `MembershipLimit` | 100 | Members per organization |
+| `AllowUserToCreateOrganization` | always | `Func<User, Task<bool>>` |
+| `CreatorRole` | `owner` | Role of the user who creates an organization |
+| `Roles` | owner (300), admin (200), member (100) | Rank and `resource:action` permissions per role |
+| `MapAddMemberEndpoint` | false | Adding members directly is a server-side API (`IOrganizationService.AddMemberAsync`) until invitations ship |
+
+Endpoints, under `/organization`, all require sign-in. Where `organizationId` is optional, the session's active organization is used.
+
+| Method | Path | Requires |
+|---|---|---|
+| POST | `/create` | caller becomes `owner`; set as active |
+| GET | `/check-slug?slug=` | |
+| POST | `/update` | `organization:update` |
+| POST | `/delete` | `organization:delete`; removes members |
+| GET | `/list` | the caller's organizations |
+| GET | `/full` | membership |
+| POST | `/set-active` | membership (`null` clears) |
+| GET | `/active-member` | |
+| POST | `/members/remove`, `/members/update-role` | `member:delete` / `member:update` |
+| POST | `/leave` | membership |
+
+Rules enforced server-side:
+- Every organization-scoped call re-checks membership in the database. Non-members and unknown ids both get `ORG_NOT_MEMBER`.
+- A member cannot grant, change or remove a role ranked above their own.
+- An organization always keeps an owner (`ORG_LAST_OWNER`).
+- Deleting a user removes their memberships.
+
+Protect your own endpoints by the caller's role in their active organization:
+
+```csharp
+app.MapPost("/projects", CreateProject).RequireOrganizationPermission("project:create");
+```
+
+Organization logs use event IDs 10000–10999. Invitations, teams, dynamic roles and hooks are separate issues.
 
 ## Rate limiting
 
