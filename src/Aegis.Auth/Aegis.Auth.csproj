@@ -9,6 +9,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Aegis.Auth.Http" />
     <InternalsVisibleTo Include="Aegis.Auth.Tests" />
+    <InternalsVisibleTo Include="Aegis.Auth.Benchmarks" />
   </ItemGroup>
 
   <ItemGroup>

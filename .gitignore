@@ -31,3 +31,6 @@ packages/
 *.tmp
 *.temp
 TODO.md
+
+# BenchmarkDotNet results
+BenchmarkDotNet.Artifacts/
