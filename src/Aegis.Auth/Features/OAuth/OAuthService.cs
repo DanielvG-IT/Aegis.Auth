@@ -14,11 +14,12 @@ public interface IOAuthService
     Task<Result<OAuthSignInResult>> SignInExternalAsync(OAuthSignInInput input, CancellationToken cancellationToken = default);
 }
 
-internal sealed class OAuthService(IOptions<AegisAuthOptions> optionsAccessor, IAuthDbContext dbContext, ISessionService sessionService) : IOAuthService
+internal sealed class OAuthService(IOptions<AegisAuthOptions> optionsAccessor, IAuthDbContext dbContext, ISessionService sessionService, TimeProvider timeProvider) : IOAuthService
 {
     private readonly AegisAuthOptions _options = optionsAccessor.Value;
     private readonly IAuthDbContext _db = dbContext;
     private readonly ISessionService _sessionService = sessionService;
+    private readonly TimeProvider _time = timeProvider;
 
     public async Task<Result<OAuthSignInResult>> SignInExternalAsync(OAuthSignInInput input, CancellationToken cancellationToken = default)
     {
@@ -53,7 +54,7 @@ internal sealed class OAuthService(IOptions<AegisAuthOptions> optionsAccessor, I
         User? user = account?.User;
         var createdUser = false;
         var linkedByEmail = false;
-        DateTime now = DateTime.UtcNow;
+        DateTime now = _time.GetUtcNow().UtcDateTime;
 
         if (account is null && normalizedEmail is not null && _options.OAuth.AutoLinkByEmail)
         {

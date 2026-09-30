@@ -19,8 +19,8 @@ public sealed class AuthContextAccessorTests : IDisposable
     public AuthContextAccessorTests()
     {
         _fixture = new ServiceTestFixture();
-        _cookieHandler = new SessionCookieHandler(_fixture.Options, isDevelopment: true);
-        _sut = new AegisAuthContextAccessor(_cookieHandler, _fixture.DbContext);
+        _cookieHandler = new SessionCookieHandler(_fixture.Options, isDevelopment: true, _fixture.Time);
+        _sut = new AegisAuthContextAccessor(_cookieHandler, _fixture.DbContext, _fixture.Time);
     }
 
     public void Dispose() => _fixture.Dispose();
@@ -69,7 +69,8 @@ public sealed class AuthContextAccessorTests : IDisposable
     public async Task GetCurrentAsync_ExpiredSession_ReturnsNull()
     {
         (User user, _) = await _fixture.SeedUserAsync();
-        await SeedSessionAsync(user, token: "expired-token", expiresAt: DateTime.UtcNow.AddMinutes(-5));
+        Session session = await SeedSessionAsync(user, token: "expired-token");
+        _fixture.Time.Advance(session.ExpiresAt - _fixture.Time.GetUtcNow().UtcDateTime);
 
         DefaultHttpContext httpContext = CreateHttpContextWithSessionCookie("expired-token");
 
@@ -90,8 +91,8 @@ public sealed class AuthContextAccessorTests : IDisposable
             };
         });
 
-        var cookieHandler = new SessionCookieHandler(fixture.Options, isDevelopment: true);
-        IAegisAuthContextAccessor sut = new AegisAuthContextAccessor(cookieHandler, fixture.DbContext);
+        var cookieHandler = new SessionCookieHandler(fixture.Options, isDevelopment: true, fixture.Time);
+        IAegisAuthContextAccessor sut = new AegisAuthContextAccessor(cookieHandler, fixture.DbContext, fixture.Time);
 
         (User user, _) = await fixture.SeedUserAsync();
         Session session = await SeedSessionAsync(fixture, user, token: "cached-token");
@@ -105,6 +106,33 @@ public sealed class AuthContextAccessorTests : IDisposable
         Assert.Equal(session.Token, context.SessionToken);
         Assert.Equal(session.ExpiresAt, context.ExpiresAt);
         Assert.True(context.IsFromCookieCache);
+    }
+
+    [Fact]
+    public async Task GetCurrentAsync_CookieCacheExpired_FallsBackToDatabase()
+    {
+        using var fixture = new ServiceTestFixture(options =>
+        {
+            options.Session.CookieCache = new CookieCacheOptions
+            {
+                Enabled = true,
+                MaxAge = 300,
+            };
+        });
+
+        var cookieHandler = new SessionCookieHandler(fixture.Options, isDevelopment: true, fixture.Time);
+        IAegisAuthContextAccessor sut = new AegisAuthContextAccessor(cookieHandler, fixture.DbContext, fixture.Time);
+
+        (User user, _) = await fixture.SeedUserAsync();
+        Session session = await SeedSessionAsync(fixture, user, token: "cached-token");
+        DefaultHttpContext httpContext = CreateHttpContextWithSessionCookies(cookieHandler, session, user);
+
+        fixture.Time.Advance(TimeSpan.FromSeconds(301));
+        AegisAuthContext? context = await sut.GetCurrentAsync(httpContext);
+
+        Assert.NotNull(context);
+        Assert.Equal(user.Id, context!.UserId);
+        Assert.False(context.IsFromCookieCache);
     }
 
     private DefaultHttpContext CreateHttpContextWithSessionCookie(string token)
@@ -138,18 +166,19 @@ public sealed class AuthContextAccessorTests : IDisposable
 
     private static async Task<Session> SeedSessionAsync(ServiceTestFixture fixture, User user, string token, DateTime? expiresAt = null)
     {
+        DateTime now = fixture.Time.GetUtcNow().UtcDateTime;
         var session = new Session
         {
             Id = Guid.CreateVersion7().ToString(),
             Token = token,                            // [NotMapped] – kept for assertion convenience
             TokenHash = AegisCrypto.HashToken(token), // the only value persisted to the DB
-            ExpiresAt = expiresAt ?? DateTime.UtcNow.AddDays(7),
+            ExpiresAt = expiresAt ?? now.AddDays(7),
             UserId = user.Id,
             User = user,
             IpAddress = "127.0.0.1",
             UserAgent = "TestAgent/1.0",
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
+            CreatedAt = now,
+            UpdatedAt = now,
         };
 
         fixture.DbContext.Sessions.Add(session);

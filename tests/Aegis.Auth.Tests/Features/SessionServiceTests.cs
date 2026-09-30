@@ -32,6 +32,7 @@ public sealed class SessionServiceTests : IDisposable
             Microsoft.Extensions.Options.Options.Create(_fixture.Options),
             _fixture.LoggerFactory,
             _fixture.DbContext,
+            _fixture.Time,
             _fixture.CacheMock.Object);
     }
 
@@ -139,7 +140,7 @@ public sealed class SessionServiceTests : IDisposable
     public async Task CreateSession_DontRememberMe_ExpiresInOneDay()
     {
         User user = CreateTestUser();
-        DateTime before = DateTime.UtcNow;
+        DateTime before = _fixture.Time.GetUtcNow().UtcDateTime;
 
         Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user, dontRemember: true));
 
@@ -153,7 +154,7 @@ public sealed class SessionServiceTests : IDisposable
     {
         _fixture.Options.Session.ExpiresIn = 3600; // 1 hour
         User user = CreateTestUser();
-        DateTime before = DateTime.UtcNow;
+        DateTime before = _fixture.Time.GetUtcNow().UtcDateTime;
 
         Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user, dontRemember: false));
 
@@ -167,7 +168,7 @@ public sealed class SessionServiceTests : IDisposable
     {
         _fixture.Options.Session.ExpiresIn = 0;
         User user = CreateTestUser();
-        DateTime before = DateTime.UtcNow;
+        DateTime before = _fixture.Time.GetUtcNow().UtcDateTime;
 
         Result<Session> result = await _sut.CreateSessionAsync(CreateInput(user, dontRemember: false));
 
@@ -266,6 +267,7 @@ public sealed class SessionServiceTests : IDisposable
             Microsoft.Extensions.Options.Options.Create(_fixture.Options),
             _fixture.LoggerFactory,
             _fixture.DbContext,
+            _fixture.Time,
             disCache: null);
 
         User user = CreateTestUser();

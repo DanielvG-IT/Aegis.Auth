@@ -2,6 +2,7 @@ using System.Globalization;
 
 using Aegis.Auth.Constants;
 using Aegis.Auth.Logging;
+using Aegis.Auth.Plugins;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -36,7 +37,6 @@ internal static class RateLimitEndpointExtensions
             return TooManyRequests(httpContext, decision.RetryAfter);
         });
 
-    // Same problem shape as Aegis.Auth.Http's AegisHttpResultMapper, which this project cannot reference.
     private static IResult TooManyRequests(HttpContext httpContext, TimeSpan? retryAfter)
     {
         if (retryAfter is TimeSpan delay)
@@ -44,15 +44,6 @@ internal static class RateLimitEndpointExtensions
             httpContext.Response.Headers.RetryAfter = Math.Ceiling(delay.TotalSeconds).ToString(CultureInfo.InvariantCulture);
         }
 
-        return Results.Problem(
-            detail: "Too many requests. Please try again later.",
-            title: "Too Many Requests",
-            statusCode: StatusCodes.Status429TooManyRequests,
-            type: $"https://httpstatuses.com/{StatusCodes.Status429TooManyRequests}",
-            instance: httpContext.Request.Path,
-            extensions: new Dictionary<string, object?>
-            {
-                ["errorCode"] = AuthErrors.RateLimit.TooManyRequests,
-            });
+        return AegisResults.Problem(httpContext, AuthErrors.RateLimit.TooManyRequests, "Too many requests. Please try again later.");
     }
 }

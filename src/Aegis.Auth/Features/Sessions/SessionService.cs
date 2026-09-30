@@ -23,12 +23,13 @@ namespace Aegis.Auth.Features.Sessions
 
     // The distributed cache is optional. DI ignores nullable annotations, so the "= null" default is what lets the
     // container activate this service when no IDistributedCache is registered; sessions are then stored in the database only.
-    internal sealed class SessionService(IOptions<AegisAuthOptions> optionsAccessor, ILoggerFactory loggerFactory, IAuthDbContext dbContext, IDistributedCache? disCache = null) : ISessionService
+    internal sealed class SessionService(IOptions<AegisAuthOptions> optionsAccessor, ILoggerFactory loggerFactory, IAuthDbContext dbContext, TimeProvider timeProvider, IDistributedCache? disCache = null) : ISessionService
     {
         private readonly AegisAuthOptions _options = optionsAccessor.Value;
         private readonly IDistributedCache? _cache = disCache;
         private readonly IAuthDbContext _db = dbContext;
         private readonly ILogger _logger = loggerFactory.CreateLogger<SessionService>();
+        private readonly TimeProvider _time = timeProvider;
 
         private const int DefaultSessionExpiration = 604800; // 7 days in seconds (60 * 60 * 24 * 7)
         private const string RegistryKeyPrefix = "active-sessions-";
@@ -39,8 +40,9 @@ namespace Aegis.Auth.Features.Sessions
 
             var sessionExpiration = _options.Session.ExpiresIn is not 0 ? _options.Session.ExpiresIn : DefaultSessionExpiration;
 
-            DateTime now = DateTime.UtcNow;
-            var nowUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            DateTimeOffset nowOffset = _time.GetUtcNow();
+            DateTime now = nowOffset.UtcDateTime;
+            var nowUnixMs = nowOffset.ToUnixTimeMilliseconds();
 
             var rawToken = AegisCrypto.RandomStringGenerator(32, "a-z", "A-Z", "0-9");
             var data = new Session
@@ -171,7 +173,7 @@ namespace Aegis.Auth.Features.Sessions
 
                 if (TryDeserializeSessionReferences(registryJson, out List<SessionReference>? list))
                 {
-                    var nowUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                    var nowUnixMs = _time.GetUtcNow().ToUnixTimeMilliseconds();
                     // Remove the revoked session and any expired ones
                     list = [.. list!.Where(s => s.Token != token && s.ExpiresAt > nowUnixMs)];
 

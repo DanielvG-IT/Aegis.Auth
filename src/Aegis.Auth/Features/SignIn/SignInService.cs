@@ -20,7 +20,7 @@ namespace Aegis.Auth.Features.SignIn
         Task<Result<SignInResult>> SignInEmail(SignInEmailInput input, CancellationToken cancellationToken = default);
     }
 
-    internal sealed class SignInService(IOptions<AegisAuthOptions> optionsAccessor, ILoggerFactory loggerFactory, IAuthDbContext dbContext, ISessionService sessionService, IEmailVerificationService emailVerificationService, IRateLimitService rateLimitService) : ISignInService
+    internal sealed class SignInService(IOptions<AegisAuthOptions> optionsAccessor, ILoggerFactory loggerFactory, IAuthDbContext dbContext, ISessionService sessionService, IEmailVerificationService emailVerificationService, IRateLimitService rateLimitService, TimeProvider timeProvider) : ISignInService
     {
         private readonly ISessionService _sessionService = sessionService;
         private readonly IEmailVerificationService _emailVerificationService = emailVerificationService;
@@ -28,6 +28,7 @@ namespace Aegis.Auth.Features.SignIn
         private readonly AegisAuthOptions _options = optionsAccessor.Value;
         private readonly IAuthDbContext _db = dbContext;
         private readonly ILogger _logger = loggerFactory.CreateLogger<SignInService>();
+        private readonly TimeProvider _time = timeProvider;
 
         public async Task<Result<SignInResult>> SignInEmail(SignInEmailInput input, CancellationToken cancellationToken = default)
         {
@@ -93,7 +94,7 @@ namespace Aegis.Auth.Features.SignIn
             }
 
             AccountLockoutOptions lockout = _options.AccountLockout;
-            if (lockout.Enabled && user.LockoutUntil > DateTime.UtcNow)
+            if (lockout.Enabled && user.LockoutUntil > _time.GetUtcNow().UtcDateTime)
             {
                 _logger.SignInAccountLocked(user.Id);
                 // Hash anyway so a locked account costs the same time as a wrong password.
@@ -190,16 +191,32 @@ namespace Aegis.Auth.Features.SignIn
 
         private async Task RecordFailedSignInAsync(User user, AccountLockoutOptions lockout, CancellationToken cancellationToken)
         {
-            user.FailedSignInCount++;
-            if (user.FailedSignInCount >= lockout.MaxFailedAttempts)
+            // Atomic increment and read-back: parallel wrong-password attempts must each count toward the lockout.
+            IQueryable<User> row = _db.Users.Where(u => u.Id == user.Id);
+            await row.ExecuteUpdateAsync(s => s.SetProperty(u => u.FailedSignInCount, u => u.FailedSignInCount + 1), cancellationToken);
+            var failedCount = await row.Select(u => u.FailedSignInCount).FirstAsync(cancellationToken);
+
+            if (failedCount >= lockout.MaxFailedAttempts)
             {
-                _logger.SignInAccountLockedOut(user.Id, user.FailedSignInCount);
-                user.LockoutUntil = lockout.PermanentLockout ? DateTime.MaxValue : DateTime.UtcNow.Add(lockout.LockoutDuration);
-                // Start fresh once the lock expires, instead of re-locking on the next single failure.
-                user.FailedSignInCount = 0;
+                DateTime lockoutUntil = lockout.PermanentLockout ? DateTime.MaxValue : _time.GetUtcNow().UtcDateTime.Add(lockout.LockoutDuration);
+                // Conditional, so of several attempts crossing the threshold together only one applies the lock.
+                // The counter starts fresh once the lock expires, instead of re-locking on the next single failure.
+                var locked = await row
+                    .Where(u => u.FailedSignInCount >= lockout.MaxFailedAttempts)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(u => u.LockoutUntil, lockoutUntil)
+                        .SetProperty(u => u.FailedSignInCount, 0), cancellationToken);
+                if (locked > 0)
+                {
+                    _logger.SignInAccountLockedOut(user.Id, failedCount);
+                }
             }
 
-            await _db.SaveChangesAsync(cancellationToken);
+            // ExecuteUpdate bypasses the change tracker; refresh the tracked instance so later reads in this scope see the new state.
+            if (_db is DbContext context)
+            {
+                await context.Entry(user).ReloadAsync(cancellationToken);
+            }
         }
 
         // public async Task<Result<User>> SignInSocial(string email, string password, string? callback)

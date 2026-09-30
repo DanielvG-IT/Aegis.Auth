@@ -27,7 +27,8 @@ public sealed class OAuthServiceTests : IDisposable
         _sut = new OAuthService(
             Microsoft.Extensions.Options.Options.Create(_fixture.Options),
             _fixture.DbContext,
-            _sessionMock.Object);
+            _sessionMock.Object,
+            _fixture.Time);
     }
 
     public void Dispose() => _fixture.Dispose();
