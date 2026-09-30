@@ -5,6 +5,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
 
 using Moq;
 
@@ -22,6 +23,13 @@ internal sealed class ServiceTestFixture : IDisposable
     public AegisAuthOptions Options { get; }
 
     private readonly SqliteConnection? _connection;
+
+    /// <summary>
+    /// Clock handed to the services under test. Starts at the real current time and only moves
+    /// when a test calls <see cref="FakeTimeProvider.Advance"/>.
+    /// </summary>
+    public FakeTimeProvider Time { get; } = new(DateTimeOffset.UtcNow);
+
     private static int _dbCounter;
 
     /// <param name="useSqlite">
@@ -85,7 +93,7 @@ internal sealed class ServiceTestFixture : IDisposable
         string password = "ValidPass123!",
         string? name = "Test User")
     {
-        DateTime now = DateTime.UtcNow;
+        DateTime now = Time.GetUtcNow().UtcDateTime;
         var hashedPassword = await Options.EmailAndPassword.Password.Hash(password);
 
         var user = new User
@@ -120,7 +128,7 @@ internal sealed class ServiceTestFixture : IDisposable
     /// </summary>
     public async Task<User> SeedOAuthOnlyUserAsync(string email = "oauth@test.com", string providerId = "google")
     {
-        DateTime now = DateTime.UtcNow;
+        DateTime now = Time.GetUtcNow().UtcDateTime;
         var user = new User
         {
             Id = Guid.CreateVersion7().ToString(),
@@ -152,7 +160,7 @@ internal sealed class ServiceTestFixture : IDisposable
     /// </summary>
     public async Task<User> SeedUserWithNullPasswordHashAsync(string email = "nohash@test.com")
     {
-        DateTime now = DateTime.UtcNow;
+        DateTime now = Time.GetUtcNow().UtcDateTime;
         var user = new User
         {
             Id = Guid.CreateVersion7().ToString(),

@@ -30,8 +30,9 @@ public sealed class EmailVerificationServiceTests : IDisposable
             Microsoft.Extensions.Options.Options.Create(_fixture.Options),
             _fixture.LoggerFactory,
             _fixture.DbContext,
-            new AuthTokenStore(_fixture.DbContext),
-            _services);
+            new AuthTokenStore(_fixture.DbContext, _fixture.Time),
+            _services,
+            _fixture.Time);
     }
 
     public void Dispose()
@@ -219,8 +220,7 @@ public sealed class EmailVerificationServiceTests : IDisposable
     {
         var (user, _) = await _fixture.SeedUserAsync();
         var rawToken = await _sut.GenerateVerificationTokenAsync(user.Id);
-        StoredToken(rawToken)!.ExpiresAt = DateTime.UtcNow.AddMinutes(-1);
-        await _fixture.DbContext.SaveChangesAsync();
+        _fixture.Time.Advance(TimeSpan.FromSeconds(_fixture.Options.EmailVerification.ExpiresIn + 1));
 
         Result<User> result = await _sut.VerifyEmailAsync(rawToken);
 

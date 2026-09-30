@@ -120,7 +120,7 @@ public sealed class ConcurrencyTests : IDisposable
         var tokenHash = AegisCrypto.HashToken(rawToken);
         await using (TestDbContext db = _database.CreateContext())
         {
-            var store = new AuthTokenStore(db);
+            var store = new AuthTokenStore(db, TimeProvider.System);
             await Assert.ThrowsAsync<InvalidOperationException>(() => store.TryConsumeAsync(
                 tokenHash,
                 PasswordResetService.TokenPurpose,
@@ -130,7 +130,7 @@ public sealed class ConcurrencyTests : IDisposable
         await using (TestDbContext db = _database.CreateContext())
         {
             Assert.Null((await db.AuthTokens.SingleAsync(t => t.TokenHash == tokenHash)).ConsumedAt);
-            Assert.True(await new AuthTokenStore(db).TryConsumeAsync(tokenHash, PasswordResetService.TokenPurpose, _ => Task.CompletedTask));
+            Assert.True(await new AuthTokenStore(db, TimeProvider.System).TryConsumeAsync(tokenHash, PasswordResetService.TokenPurpose, _ => Task.CompletedTask));
         }
     }
 
@@ -177,15 +177,17 @@ public sealed class ConcurrencyTests : IDisposable
         _fixture.LoggerFactory,
         db,
         _sessionMock.Object,
-        new AuthTokenStore(db),
-        _services);
+        new AuthTokenStore(db, TimeProvider.System),
+        _services,
+        TimeProvider.System);
 
     private EmailVerificationService CreateEmailVerificationService(TestDbContext db) => new(
         Microsoft.Extensions.Options.Options.Create(_fixture.Options),
         _fixture.LoggerFactory,
         db,
-        new AuthTokenStore(db),
-        _services);
+        new AuthTokenStore(db, TimeProvider.System),
+        _services,
+        TimeProvider.System);
 
     private SignInService CreateSignInService(TestDbContext db, IRateLimitService rateLimit) => new(
         Microsoft.Extensions.Options.Options.Create(_fixture.Options),
@@ -193,5 +195,6 @@ public sealed class ConcurrencyTests : IDisposable
         db,
         _sessionMock.Object,
         new Mock<IEmailVerificationService>(MockBehavior.Strict).Object,
-        rateLimit);
+        rateLimit,
+        TimeProvider.System);
 }

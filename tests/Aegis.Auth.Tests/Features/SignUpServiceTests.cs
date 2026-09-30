@@ -34,7 +34,8 @@ public sealed class SignUpServiceTests : IDisposable
             _fixture.LoggerFactory,
             _fixture.DbContext,
             _sessionMock.Object,
-            _emailVerificationMock.Object);
+            _emailVerificationMock.Object,
+            _fixture.Time);
     }
 
     public void Dispose() => _fixture.Dispose();

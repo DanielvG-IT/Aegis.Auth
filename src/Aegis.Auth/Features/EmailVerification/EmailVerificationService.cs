@@ -17,13 +17,15 @@ internal sealed class EmailVerificationService(
     ILoggerFactory loggerFactory,
     IAuthDbContext dbContext,
     IAuthTokenStore tokenStore,
-    IServiceProvider serviceProvider) : IEmailVerificationService
+    IServiceProvider serviceProvider,
+    TimeProvider timeProvider) : IEmailVerificationService
 {
     private readonly AegisAuthOptions _options = optionsAccessor.Value;
     private readonly ILogger _logger = loggerFactory.CreateLogger<EmailVerificationService>();
     private readonly IAuthDbContext _db = dbContext;
     private readonly IAuthTokenStore _tokenStore = tokenStore;
     private readonly IServiceProvider _services = serviceProvider;
+    private readonly TimeProvider _time = timeProvider;
     internal const string TokenPurpose = "email-verification";
 
     public async Task<Result> SendVerificationEmailAsync(User user, CancellationToken ct = default)
@@ -76,7 +78,7 @@ internal sealed class EmailVerificationService(
             return Result<User>.Failure(AuthErrors.Validation.InvalidInput, "Token is required.");
 
         var tokenHash = AegisCrypto.HashToken(rawToken);
-        var now = DateTime.UtcNow;
+        var now = _time.GetUtcNow().UtcDateTime;
 
         // Only finds the owner; the atomic consume below decides whether this request may use the token.
         var userId = await _db.AuthTokens
@@ -116,7 +118,7 @@ internal sealed class EmailVerificationService(
     public async Task<string> GenerateVerificationTokenAsync(string userId, CancellationToken ct = default)
     {
         var rawToken = AegisCrypto.RandomStringGenerator(32, "a-z", "A-Z", "0-9");
-        var now = DateTime.UtcNow;
+        var now = _time.GetUtcNow().UtcDateTime;
 
         // Only the most recently sent link stays valid
         var existing = await _db.AuthTokens

@@ -19,13 +19,14 @@ namespace Aegis.Auth.Features.SignUp
         Task<Result<SignUpResult>> SignUpEmail(SignUpEmailInput input, CancellationToken cancellationToken = default);
     }
 
-    internal sealed partial class SignUpService(IOptions<AegisAuthOptions> optionsAccessor, ILoggerFactory loggerFactory, IAuthDbContext dbContext, ISessionService sessionService, IEmailVerificationService emailVerificationService) : ISignUpService
+    internal sealed partial class SignUpService(IOptions<AegisAuthOptions> optionsAccessor, ILoggerFactory loggerFactory, IAuthDbContext dbContext, ISessionService sessionService, IEmailVerificationService emailVerificationService, TimeProvider timeProvider) : ISignUpService
     {
         private readonly IEmailVerificationService _emailVerificationService = emailVerificationService;
         private readonly IAuthDbContext _db = dbContext;
         private readonly AegisAuthOptions _options = optionsAccessor.Value;
         private readonly ISessionService _sessionService = sessionService;
         private readonly ILogger _logger = loggerFactory.CreateLogger<SignUpService>();
+        private readonly TimeProvider _time = timeProvider;
 
         public async Task<Result<SignUpResult>> SignUpEmail(SignUpEmailInput input, CancellationToken cancellationToken = default)
         {
@@ -82,7 +83,7 @@ namespace Aegis.Auth.Features.SignUp
 
             _logger.SignUpCreatingUser();
 
-            DateTime now = DateTime.UtcNow;
+            DateTime now = _time.GetUtcNow().UtcDateTime;
             var hashedPassword = await _options.EmailAndPassword.Password.Hash(input.Password);
             var user = new User
             {

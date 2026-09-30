@@ -35,7 +35,8 @@ public sealed class SignInServiceTests : IDisposable
             _fixture.DbContext,
             _sessionMock.Object,
             _emailVerificationMock.Object,
-            _rateLimitService);
+            _rateLimitService,
+            _fixture.Time);
     }
 
     public void Dispose()
@@ -607,7 +608,7 @@ public sealed class SignInServiceTests : IDisposable
 
         Assert.Equal(AuthErrors.Identity.AccountLocked, result.ErrorCode);
         Assert.NotNull(user.LockoutUntil);
-        Assert.InRange(user.LockoutUntil!.Value, DateTime.UtcNow.AddMinutes(14), DateTime.UtcNow.AddMinutes(16));
+        Assert.Equal(_fixture.Time.GetUtcNow().UtcDateTime.AddMinutes(15), user.LockoutUntil);
         _sessionMock.Verify(s => s.CreateSessionAsync(It.IsAny<SessionCreateInput>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -647,8 +648,7 @@ public sealed class SignInServiceTests : IDisposable
         SetupSession();
         await FailSignInAsync(3);
 
-        user.LockoutUntil = DateTime.UtcNow.AddSeconds(-1);
-        await _fixture.DbContext.SaveChangesAsync();
+        _fixture.Time.Advance(TimeSpan.FromMinutes(15) + TimeSpan.FromSeconds(1));
         await FailSignInAsync(1);
         Result<SignInResult> result = await _sut.SignInEmail(ValidInput());
 
@@ -668,7 +668,7 @@ public sealed class SignInServiceTests : IDisposable
         Assert.Equal(DateTime.MaxValue, user.LockoutUntil);
         Assert.Equal(AuthErrors.Identity.AccountLocked, (await _sut.SignInEmail(ValidInput())).ErrorCode);
 
-        var unlock = new AccountLockoutService(_fixture.DbContext);
+        var unlock = new AccountLockoutService(_fixture.DbContext, _fixture.Time);
         Assert.True((await unlock.UnlockAsync(user.Id)).IsSuccess);
 
         Assert.True((await _sut.SignInEmail(ValidInput())).IsSuccess);
@@ -710,7 +710,8 @@ public sealed class SignInServiceTests : IDisposable
             _fixture.DbContext,
             _sessionMock.Object,
             _emailVerificationMock.Object,
-            noRateLimit);
+            noRateLimit,
+            _fixture.Time);
 
         for (var i = 0; i < 20; i++)
         {
@@ -726,7 +727,7 @@ public sealed class SignInServiceTests : IDisposable
     [Fact]
     public async Task Unlock_UnknownUser_ReturnsUserNotFound()
     {
-        var unlock = new AccountLockoutService(_fixture.DbContext);
+        var unlock = new AccountLockoutService(_fixture.DbContext, _fixture.Time);
 
         Result result = await unlock.UnlockAsync("missing-user");
 

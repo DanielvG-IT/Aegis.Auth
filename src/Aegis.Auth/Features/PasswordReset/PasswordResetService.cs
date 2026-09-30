@@ -19,7 +19,8 @@ internal sealed class PasswordResetService(
     IAuthDbContext dbContext,
     ISessionService sessionService,
     IAuthTokenStore tokenStore,
-    IServiceProvider serviceProvider) : IPasswordResetService
+    IServiceProvider serviceProvider,
+    TimeProvider timeProvider) : IPasswordResetService
 {
     private readonly AegisAuthOptions _options = optionsAccessor.Value;
     private readonly ILogger _logger = loggerFactory.CreateLogger<PasswordResetService>();
@@ -27,6 +28,7 @@ internal sealed class PasswordResetService(
     private readonly ISessionService _sessionService = sessionService;
     private readonly IAuthTokenStore _tokenStore = tokenStore;
     private readonly IServiceProvider _services = serviceProvider;
+    private readonly TimeProvider _time = timeProvider;
     internal const string TokenPurpose = "password-reset";
 
     public async Task<Result> RequestPasswordResetAsync(string email, CancellationToken ct = default)
@@ -75,7 +77,7 @@ internal sealed class PasswordResetService(
             return passwordCheck;
 
         var tokenHash = AegisCrypto.HashToken(rawToken);
-        var now = DateTime.UtcNow;
+        var now = _time.GetUtcNow().UtcDateTime;
 
         // Only finds the owner; the atomic consume below decides whether this request may use the token.
         var userId = await _db.AuthTokens
@@ -115,7 +117,7 @@ internal sealed class PasswordResetService(
     public async Task<string> GenerateResetTokenAsync(string userId, CancellationToken ct = default)
     {
         var rawToken = AegisCrypto.RandomStringGenerator(32, "a-z", "A-Z", "0-9");
-        var now = DateTime.UtcNow;
+        var now = _time.GetUtcNow().UtcDateTime;
 
         // Invalidate any existing unused reset tokens for this user
         var existing = await _db.AuthTokens

@@ -25,9 +25,10 @@ internal interface IAuthTokenStore
     Task<bool> TryConsumeAsync(string tokenHash, string purpose, Func<CancellationToken, Task> onConsumed, CancellationToken ct = default);
 }
 
-internal sealed class AuthTokenStore(IAuthDbContext dbContext) : IAuthTokenStore
+internal sealed class AuthTokenStore(IAuthDbContext dbContext, TimeProvider timeProvider) : IAuthTokenStore
 {
     private readonly IAuthDbContext _db = dbContext;
+    private readonly TimeProvider _time = timeProvider;
 
     public async Task<bool> TryConsumeAsync(string tokenHash, string purpose, Func<CancellationToken, Task> onConsumed, CancellationToken ct = default)
     {
@@ -51,7 +52,7 @@ internal sealed class AuthTokenStore(IAuthDbContext dbContext) : IAuthTokenStore
 
     private async Task<bool> ConsumeAndApplyAsync(string tokenHash, string purpose, Func<CancellationToken, Task> onConsumed, CancellationToken ct)
     {
-        var now = DateTime.UtcNow;
+        var now = _time.GetUtcNow().UtcDateTime;
         var consumed = await _db.AuthTokens
             .Where(t => t.TokenHash == tokenHash && t.Purpose == purpose && t.ConsumedAt == null && t.ExpiresAt > now)
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, now), ct);
