@@ -1,6 +1,8 @@
 using Aegis.Auth.Extensions;
 using Aegis.Auth.Http.Extensions;
 using Aegis.Auth.Options;
+using Aegis.Auth.Organizations;
+using Aegis.Auth.Plugins;
 using Aegis.Auth.Sample.Data;
 using Aegis.Auth.Sample.Services;
 
@@ -28,8 +30,9 @@ var connectionString =
     ?? "Data Source=aegis-auth-sample.db";
 
 // Configure the database (SQLite for realistic local persistence)
-builder.Services.AddDbContext<SampleAuthDbContext>(options =>
-    options.UseSqlite(connectionString));
+// UseAegisAuth adds the tables of registered plugins (here: organizations) to the model.
+builder.Services.AddDbContext<SampleAuthDbContext>((sp, options) =>
+    options.UseSqlite(connectionString).UseAegisAuth(sp));
 
 
 // Optional: a distributed cache layer for sessions (in-memory here; use e.g. Redis in production).
@@ -101,7 +104,8 @@ builder.Services.AddAegisAuth<SampleAuthDbContext>(options =>
         Enabled = true,
         MaxAge = 300 // 5 minutes
     };
-});
+})
+    .AddOrganizations(o => o.OrganizationLimit = 10);
 
 builder.Services.AddControllers();
 builder.Services.AddScoped<IProjectWorkspaceService, ProjectWorkspaceService>();

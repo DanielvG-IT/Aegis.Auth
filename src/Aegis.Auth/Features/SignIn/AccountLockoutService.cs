@@ -15,9 +15,10 @@ public interface IAccountLockoutService
     Task<Result> UnlockAsync(string userId, CancellationToken cancellationToken = default);
 }
 
-internal sealed class AccountLockoutService(IAuthDbContext dbContext) : IAccountLockoutService
+internal sealed class AccountLockoutService(IAuthDbContext dbContext, TimeProvider timeProvider) : IAccountLockoutService
 {
     private readonly IAuthDbContext _db = dbContext;
+    private readonly TimeProvider _time = timeProvider;
 
     public async Task<Result> UnlockAsync(string userId, CancellationToken cancellationToken = default)
     {
@@ -29,7 +30,7 @@ internal sealed class AccountLockoutService(IAuthDbContext dbContext) : IAccount
 
         user.FailedSignInCount = 0;
         user.LockoutUntil = null;
-        user.UpdatedAt = DateTime.UtcNow;
+        user.UpdatedAt = _time.GetUtcNow().UtcDateTime;
         await _db.SaveChangesAsync(cancellationToken);
 
         return Result.Success();

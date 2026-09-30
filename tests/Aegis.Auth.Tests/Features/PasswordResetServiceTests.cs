@@ -3,6 +3,7 @@ using Aegis.Auth.Core.Crypto;
 using Aegis.Auth.Entities;
 using Aegis.Auth.Features.PasswordReset;
 using Aegis.Auth.Features.Sessions;
+using Aegis.Auth.Infrastructure.Tokens;
 using Aegis.Auth.Options;
 using Aegis.Auth.Tests.Helpers;
 
@@ -27,7 +28,8 @@ public sealed class PasswordResetServiceTests : IDisposable
             {
                 _sent.Add(ctx);
                 return Task.CompletedTask;
-            });
+            },
+            useSqlite: true);
         _sessionMock = new Mock<ISessionService>(MockBehavior.Strict);
         _sessionMock
             .Setup(s => s.RevokeAllSessionsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -37,7 +39,9 @@ public sealed class PasswordResetServiceTests : IDisposable
             _fixture.LoggerFactory,
             _fixture.DbContext,
             _sessionMock.Object,
-            _services);
+            new AuthTokenStore(_fixture.DbContext, _fixture.Time),
+            _services,
+            _fixture.Time);
     }
 
     public void Dispose()
@@ -46,8 +50,20 @@ public sealed class PasswordResetServiceTests : IDisposable
         _fixture.Dispose();
     }
 
-    private AuthToken? StoredToken(string rawToken) =>
-        _fixture.DbContext.AuthTokens.FirstOrDefault(t => t.TokenHash == AegisCrypto.HashToken(rawToken));
+    // Reloaded because redemption writes with ExecuteUpdate, which bypasses the change tracker.
+    private AuthToken? StoredToken(string rawToken)
+    {
+        AuthToken? token = _fixture.DbContext.AuthTokens.FirstOrDefault(t => t.TokenHash == AegisCrypto.HashToken(rawToken));
+        if (token is not null)
+            _fixture.DbContext.Entry(token).Reload();
+        return token;
+    }
+
+    private string? StoredPasswordHash(Account account)
+    {
+        _fixture.DbContext.Entry(account).Reload();
+        return account.PasswordHash;
+    }
 
     // ═══════════════════════════════════════════════════════════════════════════
     // TOKEN GENERATION
@@ -206,7 +222,7 @@ public sealed class PasswordResetServiceTests : IDisposable
         Result result = await _sut.ResetPasswordAsync(rawToken, "NewPassword123!");
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("hashed:NewPassword123!", account.PasswordHash);
+        Assert.Equal("hashed:NewPassword123!", StoredPasswordHash(account));
         Assert.NotNull(StoredToken(rawToken)!.ConsumedAt);
     }
 
@@ -248,13 +264,25 @@ public sealed class PasswordResetServiceTests : IDisposable
     {
         var (user, account) = await _fixture.SeedUserAsync();
         var rawToken = await _sut.GenerateResetTokenAsync(user.Id);
-        StoredToken(rawToken)!.ExpiresAt = DateTime.UtcNow.AddMinutes(-1);
-        await _fixture.DbContext.SaveChangesAsync();
+        _fixture.Time.Advance(TimeSpan.FromSeconds(_fixture.Options.EmailAndPassword.ResetPasswordTokenExpiresIn + 1));
 
         Result result = await _sut.ResetPasswordAsync(rawToken, "NewPassword123!");
 
         Assert.Equal(AuthErrors.Token.InvalidToken, result.ErrorCode);
-        Assert.NotEqual("hashed:NewPassword123!", account.PasswordHash);
+        Assert.NotEqual("hashed:NewPassword123!", StoredPasswordHash(account));
+    }
+
+    [Fact]
+    public async Task ResetPassword_TokenJustBeforeExpiry_Succeeds()
+    {
+        var (user, account) = await _fixture.SeedUserAsync();
+        var rawToken = await _sut.GenerateResetTokenAsync(user.Id);
+        _fixture.Time.Advance(TimeSpan.FromSeconds(_fixture.Options.EmailAndPassword.ResetPasswordTokenExpiresIn - 1));
+
+        Result result = await _sut.ResetPasswordAsync(rawToken, "NewPassword123!");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("hashed:NewPassword123!", StoredPasswordHash(account));
     }
 
     [Fact]
@@ -267,7 +295,7 @@ public sealed class PasswordResetServiceTests : IDisposable
         Result second = await _sut.ResetPasswordAsync(rawToken, "SecondNewPass123!");
 
         Assert.Equal(AuthErrors.Token.InvalidToken, second.ErrorCode);
-        Assert.Equal("hashed:FirstNewPass123!", account.PasswordHash);
+        Assert.Equal("hashed:FirstNewPass123!", StoredPasswordHash(account));
     }
 
     [Fact]

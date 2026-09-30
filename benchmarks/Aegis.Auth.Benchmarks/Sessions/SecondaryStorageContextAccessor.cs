@@ -40,6 +40,7 @@ internal sealed class SecondaryStorageContextAccessor(SessionCookieHandler cooki
         return new AegisAuthContext
         {
             UserId = entry.User.Id,
+            SessionId = entry.Session.Id,
             SessionToken = sessionToken,
             ExpiresAt = entry.Session.ExpiresAt,
         };

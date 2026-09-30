@@ -15,6 +15,7 @@ public sealed class BenchDbContext(DbContextOptions<BenchDbContext> options) : D
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<Session> Sessions => Set<Session>();
     public DbSet<AuthToken> AuthTokens => Set<AuthToken>();
+    public DbSet<AegisKeyValue> AegisKeyValues => Set<AegisKeyValue>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

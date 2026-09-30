@@ -12,16 +12,28 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="ITfoxtec.Identity.Saml2" Version="4.21.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.12" />
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.12" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.12" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.10.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageReference Include="Moq" Version="4.21.0" />
+    <!-- OIDC provider spike (#116): pinned per docs/adr/0002-oidc-provider-engine.md. -->
+    <PackageReference Include="OpenIddict.AspNetCore" Version="7.7.1" />
+    <PackageReference Include="OpenIddict.EntityFrameworkCore" Version="7.7.1" />
+    <PackageReference Include="Testcontainers.Keycloak" Version="4.15.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Spikes\SamlLibrary\aegis-saml-poc-realm.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
@@ -31,6 +43,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Aegis.Auth\Aegis.Auth.csproj" />
     <ProjectReference Include="..\..\src\Aegis.Auth.Http\Aegis.Auth.Http.csproj" />
+    <ProjectReference Include="..\..\src\Aegis.Auth.Organizations\Aegis.Auth.Organizations.csproj" />
+    <ProjectReference Include="..\Aegis.Auth.TestPlugins\Aegis.Auth.TestPlugins.csproj" />
   </ItemGroup>
 
 </Project>

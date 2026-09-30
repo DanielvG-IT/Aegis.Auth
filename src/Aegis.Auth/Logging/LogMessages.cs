@@ -405,5 +405,21 @@ namespace Aegis.Auth.Logging
             Level = LogLevel.Warning,
             Message = "Request rejected: Client exceeded the rate limit for {Operation}")]
         internal static partial void RateLimitExceeded(this ILogger logger, string operation);
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // Secondary Storage Messages
+        // ═══════════════════════════════════════════════════════════════════════════════
+
+        [LoggerMessage(
+            EventId = 9000,
+            Level = LogLevel.Warning,
+            Message = "Secondary storage uses IDistributedCache, which is not atomic: IncrementAsync can lose updates and SetIfNotExistsAsync can succeed for more than one caller. Do not rely on it for single-use or replay protection across instances; use the database or a Redis implementation instead")]
+        internal static partial void SecondaryStorageNotAtomic(this ILogger logger);
+
+        [LoggerMessage(
+            EventId = 9001,
+            Level = LogLevel.Debug,
+            Message = "Secondary storage purged {Count} expired entries")]
+        internal static partial void SecondaryStorageExpiredEntriesPurged(this ILogger logger, int count);
     }
 }
