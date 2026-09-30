@@ -8,6 +8,7 @@ using Aegis.Auth.Tests.Helpers;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -26,13 +27,15 @@ internal sealed class AegisTestHost : IAsyncDisposable
     public const string ClientIpHeader = "X-Test-Client-IP";
 
     private readonly WebApplication _app;
+    private readonly SqliteConnection _keepAlive;
 
     public HttpClient Client { get; }
     public IServiceProvider Services => _app.Services;
 
-    private AegisTestHost(WebApplication app)
+    private AegisTestHost(WebApplication app, SqliteConnection keepAlive)
     {
         _app = app;
+        _keepAlive = keepAlive;
         Client = app.GetTestClient();
     }
 
@@ -47,8 +50,12 @@ internal sealed class AegisTestHost : IAsyncDisposable
         });
         builder.WebHost.UseTestServer();
 
-        var dbName = $"AegisHttpTest_{Guid.NewGuid():N}";
-        builder.Services.AddDbContext<TestDbContext>(o => o.UseInMemoryDatabase(dbName));
+        // Shared-cache SQLite in-memory: a real relational database (ExecuteUpdate, transactions) that lives
+        // while the keep-alive connection is open, with a connection per request scope like production.
+        var connectionString = $"Data Source=AegisHttpTest_{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
+        var keepAlive = new SqliteConnection(connectionString);
+        keepAlive.Open();
+        builder.Services.AddDbContext<TestDbContext>(o => o.UseSqlite(connectionString));
         builder.Services.AddDistributedMemoryCache();
         builder.Services.AddAegisAuth<TestDbContext>(options =>
         {
@@ -67,6 +74,11 @@ internal sealed class AegisTestHost : IAsyncDisposable
         configureServices?.Invoke(builder.Services);
 
         WebApplication app = builder.Build();
+        using (IServiceScope scope = app.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<TestDbContext>().Database.EnsureCreated();
+        }
+
         app.Use((context, next) =>
         {
             if (context.Request.Headers.TryGetValue(ClientIpHeader, out var clientIp))
@@ -80,8 +92,17 @@ internal sealed class AegisTestHost : IAsyncDisposable
         app.UseAuthorization();
         app.MapAegisAuthEndpoints(configureEndpoints);
 
-        await app.StartAsync();
-        return new AegisTestHost(app);
+        try
+        {
+            await app.StartAsync();
+        }
+        catch
+        {
+            await keepAlive.DisposeAsync();
+            throw;
+        }
+
+        return new AegisTestHost(app, keepAlive);
     }
 
     public async ValueTask DisposeAsync()
@@ -89,5 +110,6 @@ internal sealed class AegisTestHost : IAsyncDisposable
         Client.Dispose();
         await _app.StopAsync();
         await _app.DisposeAsync();
+        await _keepAlive.DisposeAsync();
     }
 }

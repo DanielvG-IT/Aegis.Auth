@@ -2,6 +2,7 @@ using Aegis.Auth.Abstractions;
 using Aegis.Auth.Constants;
 using Aegis.Auth.Core.Crypto;
 using Aegis.Auth.Entities;
+using Aegis.Auth.Infrastructure.Tokens;
 using Aegis.Auth.Logging;
 using Aegis.Auth.Options;
 
@@ -15,11 +16,13 @@ internal sealed class EmailVerificationService(
     IOptions<AegisAuthOptions> optionsAccessor,
     ILoggerFactory loggerFactory,
     IAuthDbContext dbContext,
+    IAuthTokenStore tokenStore,
     IServiceProvider serviceProvider) : IEmailVerificationService
 {
     private readonly AegisAuthOptions _options = optionsAccessor.Value;
     private readonly ILogger _logger = loggerFactory.CreateLogger<EmailVerificationService>();
     private readonly IAuthDbContext _db = dbContext;
+    private readonly IAuthTokenStore _tokenStore = tokenStore;
     private readonly IServiceProvider _services = serviceProvider;
     internal const string TokenPurpose = "email-verification";
 
@@ -75,27 +78,36 @@ internal sealed class EmailVerificationService(
         var tokenHash = AegisCrypto.HashToken(rawToken);
         var now = DateTime.UtcNow;
 
-        AuthToken? authToken = await _db.AuthTokens.FirstOrDefaultAsync(
-            t => t.TokenHash == tokenHash && t.Purpose == TokenPurpose,
-            ct);
+        // Only finds the owner; the atomic consume below decides whether this request may use the token.
+        var userId = await _db.AuthTokens
+            .Where(t => t.TokenHash == tokenHash && t.Purpose == TokenPurpose && t.ConsumedAt == null && t.ExpiresAt > now)
+            .Select(t => t.UserId)
+            .FirstOrDefaultAsync(ct);
 
-        if (authToken is null || authToken.ExpiresAt < now || authToken.ConsumedAt.HasValue)
-        {
-            _logger.EmailVerificationInvalidToken();
-            return Result<User>.Failure(AuthErrors.Token.InvalidToken, "Invalid or expired token.");
-        }
-
-        User? user = await _db.Users.FirstOrDefaultAsync(u => u.Id == authToken.UserId, ct);
+        User? user = userId is null ? null : await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
         if (user is null)
         {
             _logger.EmailVerificationInvalidToken();
             return Result<User>.Failure(AuthErrors.Token.InvalidToken, "Invalid or expired token.");
         }
 
-        authToken.ConsumedAt = now;
+        var consumed = await _tokenStore.TryConsumeAsync(tokenHash, TokenPurpose, token =>
+            _db.Users
+                .Where(u => u.Id == user.Id)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(u => u.EmailVerified, true)
+                    .SetProperty(u => u.UpdatedAt, now), token),
+            ct);
+
+        if (consumed is false)
+        {
+            _logger.EmailVerificationInvalidToken();
+            return Result<User>.Failure(AuthErrors.Token.InvalidToken, "Invalid or expired token.");
+        }
+
+        // Mirror the committed values on the returned (tracked) instance.
         user.EmailVerified = true;
         user.UpdatedAt = now;
-        await _db.SaveChangesAsync(ct);
 
         _logger.EmailVerificationSuccessful(user.Id);
         return user;

@@ -25,7 +25,7 @@ public sealed class SignInServiceTests : IDisposable
 
     public SignInServiceTests()
     {
-        _fixture = new ServiceTestFixture();
+        _fixture = new ServiceTestFixture(useSqlite: true);
         _sessionMock = new Mock<ISessionService>(MockBehavior.Strict);
         _emailVerificationMock = new Mock<IEmailVerificationService>(MockBehavior.Strict);
         _rateLimitService = new RateLimitService(Microsoft.Extensions.Options.Options.Create(_fixture.Options));

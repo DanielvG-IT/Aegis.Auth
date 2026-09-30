@@ -3,6 +3,7 @@ using Aegis.Auth.Constants;
 using Aegis.Auth.Core.Crypto;
 using Aegis.Auth.Entities;
 using Aegis.Auth.Features.Sessions;
+using Aegis.Auth.Infrastructure.Tokens;
 using Aegis.Auth.Logging;
 using Aegis.Auth.Options;
 
@@ -17,12 +18,14 @@ internal sealed class PasswordResetService(
     ILoggerFactory loggerFactory,
     IAuthDbContext dbContext,
     ISessionService sessionService,
+    IAuthTokenStore tokenStore,
     IServiceProvider serviceProvider) : IPasswordResetService
 {
     private readonly AegisAuthOptions _options = optionsAccessor.Value;
     private readonly ILogger _logger = loggerFactory.CreateLogger<PasswordResetService>();
     private readonly IAuthDbContext _db = dbContext;
     private readonly ISessionService _sessionService = sessionService;
+    private readonly IAuthTokenStore _tokenStore = tokenStore;
     private readonly IServiceProvider _services = serviceProvider;
     internal const string TokenPurpose = "password-reset";
 
@@ -74,35 +77,38 @@ internal sealed class PasswordResetService(
         var tokenHash = AegisCrypto.HashToken(rawToken);
         var now = DateTime.UtcNow;
 
-        AuthToken? authToken = await _db.AuthTokens.FirstOrDefaultAsync(
-            t => t.TokenHash == tokenHash && t.Purpose == TokenPurpose,
-            ct);
+        // Only finds the owner; the atomic consume below decides whether this request may use the token.
+        var userId = await _db.AuthTokens
+            .Where(t => t.TokenHash == tokenHash && t.Purpose == TokenPurpose && t.ConsumedAt == null && t.ExpiresAt > now)
+            .Select(t => t.UserId)
+            .FirstOrDefaultAsync(ct);
 
-        if (authToken is null || authToken.ExpiresAt < now || authToken.ConsumedAt.HasValue)
+        if (userId is null
+            || await _db.Accounts.AnyAsync(a => a.UserId == userId && a.ProviderId == "credential", ct) is false)
         {
             _logger.PasswordResetInvalidToken();
             return Result.Failure(AuthErrors.Token.InvalidToken, "Invalid or expired token.");
         }
 
-        Account? account = await _db.Accounts.FirstOrDefaultAsync(
-            a => a.UserId == authToken.UserId && a.ProviderId == "credential",
+        var passwordHash = await _options.EmailAndPassword.Password.Hash(newPassword);
+        var consumed = await _tokenStore.TryConsumeAsync(tokenHash, TokenPurpose, token =>
+            _db.Accounts
+                .Where(a => a.UserId == userId && a.ProviderId == "credential")
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(a => a.PasswordHash, passwordHash)
+                    .SetProperty(a => a.UpdatedAt, now), token),
             ct);
 
-        if (account is null)
+        if (consumed is false)
         {
             _logger.PasswordResetInvalidToken();
             return Result.Failure(AuthErrors.Token.InvalidToken, "Invalid or expired token.");
         }
-
-        authToken.ConsumedAt = now;
-        account.PasswordHash = await _options.EmailAndPassword.Password.Hash(newPassword);
-        account.UpdatedAt = now;
-        await _db.SaveChangesAsync(ct);
 
         if (_options.EmailAndPassword.RevokeSessionsOnPasswordReset)
-            await _sessionService.RevokeAllSessionsAsync(authToken.UserId, ct);
+            await _sessionService.RevokeAllSessionsAsync(userId, ct);
 
-        _logger.PasswordResetSuccessful(authToken.UserId);
+        _logger.PasswordResetSuccessful(userId);
         return Result.Success();
     }
 

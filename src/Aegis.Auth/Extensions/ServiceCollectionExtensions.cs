@@ -16,6 +16,7 @@ using Aegis.Auth.Features.SignOut;
 using Aegis.Auth.Features.SignUp;
 using Aegis.Auth.Infrastructure.Auth;
 using Aegis.Auth.Infrastructure.Cookies;
+using Aegis.Auth.Infrastructure.Tokens;
 using Aegis.Auth.Options;
 
 using Microsoft.AspNetCore.Authentication;
@@ -96,6 +97,7 @@ namespace Aegis.Auth.Extensions
             services.AddScoped<IAegisAuthContextAccessor, AegisAuthContextAccessor>();
             services.AddScoped<ICsrfTokenService, CsrfTokenService>();
             services.AddScoped<IEmailVerificationService, EmailVerificationService>();
+            services.AddScoped<IAuthTokenStore, AuthTokenStore>();
             services.AddScoped<IPasswordResetService, PasswordResetService>();
             services.AddScoped<ITokenEncryptionService, TokenEncryptionService>();
             services.AddSingleton<IRateLimitService, RateLimitService>();
