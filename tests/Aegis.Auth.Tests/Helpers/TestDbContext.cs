@@ -17,6 +17,7 @@ internal sealed class TestDbContext : DbContext, IAuthDbContext
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<Session> Sessions => Set<Session>();
     public DbSet<AuthToken> AuthTokens => Set<AuthToken>();
+    public DbSet<AegisKeyValue> AegisKeyValues => Set<AegisKeyValue>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -49,6 +50,8 @@ internal sealed class TestDbContext : DbContext, IAuthDbContext
              .WithMany(u => u.AuthTokens)
              .HasForeignKey(a => a.UserId);
         });
+
+        modelBuilder.Entity<AegisKeyValue>(e => e.HasKey(kv => kv.Key));
     }
 
     Task<int> IAuthDbContext.SaveChangesAsync(CancellationToken ct) => base.SaveChangesAsync(ct);

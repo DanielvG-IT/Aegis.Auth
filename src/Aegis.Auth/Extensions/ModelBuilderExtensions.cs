@@ -1,5 +1,6 @@
 using Aegis.Auth.Entities;
 using Aegis.Auth.Features.OAuth;
+using Aegis.Auth.Features.SecondaryStorage;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -61,6 +62,14 @@ namespace Aegis.Auth.Extensions
                     .WithMany(u => u.AuthTokens)
                     .HasForeignKey(e => e.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<AegisKeyValue>(entity =>
+            {
+                entity.HasKey(e => e.Key);
+                entity.Property(e => e.Key).HasMaxLength(AegisStorageKey.MaxLength);
+                entity.Property(e => e.Value).IsRequired();
+                entity.HasIndex(e => e.ExpiresAt);
             });
 
             return modelBuilder;

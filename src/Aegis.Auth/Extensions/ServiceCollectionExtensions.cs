@@ -10,6 +10,7 @@ using Aegis.Auth.Features.EmailVerification;
 using Aegis.Auth.Features.OAuth;
 using Aegis.Auth.Features.PasswordReset;
 using Aegis.Auth.Features.RateLimit;
+using Aegis.Auth.Features.SecondaryStorage;
 using Aegis.Auth.Features.Sessions;
 using Aegis.Auth.Features.SignIn;
 using Aegis.Auth.Features.SignOut;
@@ -102,6 +103,12 @@ namespace Aegis.Auth.Extensions
             services.AddScoped<ITokenEncryptionService, TokenEncryptionService>();
             services.AddSingleton<IRateLimitService, RateLimitService>();
             services.AddHostedService<OAuthStartupDiagnostics>();
+
+            // Secondary storage: in-memory unless AddAegisDistributedCacheSecondaryStorage(),
+            // AddAegisDatabaseSecondaryStorage() or a custom IAegisSecondaryStorage replaces it.
+            services.TryAddSingleton(TimeProvider.System);
+            services.TryAddSingleton<IAegisSecondaryStorage, InMemorySecondaryStorage>();
+            services.AddHostedService<SecondaryStorageStartupDiagnostics>();
 
             return services;
         }

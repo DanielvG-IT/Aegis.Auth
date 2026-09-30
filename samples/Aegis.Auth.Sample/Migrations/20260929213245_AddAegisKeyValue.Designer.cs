@@ -3,6 +3,7 @@ using System;
 using Aegis.Auth.Sample.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Aegis.Auth.Sample.Migrations
 {
     [DbContext(typeof(SampleAuthDbContext))]
-    partial class SampleAuthDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260929213245_AddAegisKeyValue")]
+    partial class AddAegisKeyValue
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
