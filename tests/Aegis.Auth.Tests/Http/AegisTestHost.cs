@@ -3,6 +3,7 @@ using System.Net;
 using Aegis.Auth.Extensions;
 using Aegis.Auth.Http.Extensions;
 using Aegis.Auth.Options;
+using Aegis.Auth.Plugins;
 using Aegis.Auth.Tests.Helpers;
 
 using Microsoft.AspNetCore.Builder;
@@ -39,7 +40,8 @@ internal sealed class AegisTestHost : IAsyncDisposable
     public static async Task<AegisTestHost> StartAsync(
         Action<AegisAuthOptions>? configure = null,
         Action<AegisAuthEndpointMapOptions>? configureEndpoints = null,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        Action<IAegisAuthBuilder>? configureAegis = null)
     {
         WebApplicationBuilder builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
@@ -48,9 +50,9 @@ internal sealed class AegisTestHost : IAsyncDisposable
         builder.WebHost.UseTestServer();
 
         var dbName = $"AegisHttpTest_{Guid.NewGuid():N}";
-        builder.Services.AddDbContext<TestDbContext>(o => o.UseInMemoryDatabase(dbName));
+        builder.Services.AddDbContext<TestDbContext>((sp, o) => o.UseInMemoryDatabase(dbName).UseAegisAuth(sp));
         builder.Services.AddDistributedMemoryCache();
-        builder.Services.AddAegisAuth<TestDbContext>(options =>
+        IAegisAuthBuilder aegis = builder.Services.AddAegisAuth<TestDbContext>(options =>
         {
             options.AppName = "AegisHttpTest";
             options.BaseURL = "http://localhost";
@@ -63,6 +65,7 @@ internal sealed class AegisTestHost : IAsyncDisposable
             };
             configure?.Invoke(options);
         });
+        configureAegis?.Invoke(aegis);
 
         configureServices?.Invoke(builder.Services);
 
