@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Aegis.Auth\Aegis.Auth.csproj" />
     <ProjectReference Include="..\..\src\Aegis.Auth.Http\Aegis.Auth.Http.csproj" />
+    <ProjectReference Include="..\..\src\Aegis.Auth.Organizations\Aegis.Auth.Organizations.csproj" />
   </ItemGroup>
 
 </Project>
