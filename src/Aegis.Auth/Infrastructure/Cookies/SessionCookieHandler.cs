@@ -10,10 +10,11 @@ using Microsoft.AspNetCore.Http;
 
 namespace Aegis.Auth.Infrastructure.Cookies
 {
-    public sealed class SessionCookieHandler(AegisAuthOptions options, bool isDevelopment = false)
+    public sealed class SessionCookieHandler(AegisAuthOptions options, bool isDevelopment = false, TimeProvider? timeProvider = null)
     {
         private readonly AegisAuthOptions _options = options;
         private readonly bool _isDevelopment = isDevelopment;
+        private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
         // TODO Cookie roadmap:
         // [ ] Add per-cookie config models (session_token, session_data, dont_remember)
@@ -66,6 +67,7 @@ namespace Aegis.Auth.Infrastructure.Cookies
             if (_options.Session.CookieCache?.Enabled is false) return;
 
             var sessionDataCookieName = SessionDataCookieName;
+            DateTimeOffset now = _time.GetUtcNow();
 
             var sessionPayload = new SessionCacheDto
             {
@@ -74,11 +76,11 @@ namespace Aegis.Auth.Infrastructure.Cookies
                     Session = session.ToDto(),
                     User = user.ToDto(),
                 },
-                UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                UpdatedAt = now.ToUnixTimeMilliseconds(),
                 Version = _options.Session.CookieCache?.Version ?? "1"
             };
 
-            DateTimeOffset cacheExpiry = DateTimeOffset.UtcNow.AddSeconds(_options.Session.CookieCache?.MaxAge ?? 300);
+            DateTimeOffset cacheExpiry = now.AddSeconds(_options.Session.CookieCache?.MaxAge ?? 300);
             var signableEnvelope = new
             {
                 ExpiresAt = cacheExpiry.ToUnixTimeMilliseconds(),
@@ -151,7 +153,7 @@ namespace Aegis.Auth.Infrastructure.Cookies
             if (envelope is null) return null;
 
             // Check expiration
-            var nowUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            var nowUnixMs = _time.GetUtcNow().ToUnixTimeMilliseconds();
             if (envelope.ExpiresAt <= nowUnixMs)
                 return null;
 

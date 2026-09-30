@@ -20,6 +20,7 @@
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.12" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.12" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.10.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageReference Include="Moq" Version="4.21.0" />
     <!-- OIDC provider spike (#116): pinned per docs/adr/0002-oidc-provider-engine.md. -->
@@ -36,6 +37,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Aegis.Auth\Aegis.Auth.csproj" />
     <ProjectReference Include="..\..\src\Aegis.Auth.Http\Aegis.Auth.Http.csproj" />
+    <ProjectReference Include="..\Aegis.Auth.TestPlugins\Aegis.Auth.TestPlugins.csproj" />
   </ItemGroup>
 
 </Project>

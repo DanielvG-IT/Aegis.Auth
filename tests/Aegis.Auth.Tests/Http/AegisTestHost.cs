@@ -4,14 +4,17 @@ using Aegis.Auth.Abstractions;
 using Aegis.Auth.Extensions;
 using Aegis.Auth.Http.Extensions;
 using Aegis.Auth.Options;
+using Aegis.Auth.Plugins;
 using Aegis.Auth.Tests.Helpers;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Aegis.Auth.Tests.Http;
 
@@ -27,28 +30,42 @@ internal sealed class AegisTestHost : IAsyncDisposable
     public const string ClientIpHeader = "X-Test-Client-IP";
 
     private readonly WebApplication _app;
+    private readonly SqliteConnection? _keepAlive;
 
     public HttpClient Client { get; }
     public IServiceProvider Services => _app.Services;
     public TestServer Server => _app.GetTestServer();
 
-    private AegisTestHost(WebApplication app)
+    private AegisTestHost(WebApplication app, SqliteConnection? keepAlive)
     {
         _app = app;
+        _keepAlive = keepAlive;
         Client = app.GetTestClient();
     }
 
-    public static Task<AegisTestHost> StartAsync(
+    public static async Task<AegisTestHost> StartAsync(
         Action<AegisAuthOptions>? configure = null,
         Action<AegisAuthEndpointMapOptions>? configureEndpoints = null,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        FakeTimeProvider? timeProvider = null,
+        Action<IAegisAuthBuilder>? configureAegis = null)
     {
-        var dbName = $"AegisHttpTest_{Guid.NewGuid():N}";
-        return StartAsync<TestDbContext>(
-            db => db.UseInMemoryDatabase(dbName),
-            configure,
-            configureEndpoints,
-            configureServices);
+        // Shared-cache SQLite in-memory: a real relational database (ExecuteUpdate, transactions) that lives
+        // while the keep-alive connection is open, with a connection per request scope like production.
+        var connectionString = $"Data Source=AegisHttpTest_{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
+        var keepAlive = new SqliteConnection(connectionString);
+        keepAlive.Open();
+        try
+        {
+            return await StartCoreAsync<TestDbContext>(
+                db => db.UseSqlite(connectionString), keepAlive, configure, configureEndpoints, configureServices,
+                configureApp: null, baseAddress: null, timeProvider, configureAegis);
+        }
+        catch
+        {
+            await keepAlive.DisposeAsync();
+            throw;
+        }
     }
 
     /// <summary>
@@ -57,13 +74,28 @@ internal sealed class AegisTestHost : IAsyncDisposable
     /// endpoints after the Aegis ones; <paramref name="baseAddress"/> sets the scheme and host
     /// the server sees (and <see cref="AegisAuthOptions.BaseURL"/>).
     /// </summary>
-    public static async Task<AegisTestHost> StartAsync<TContext>(
+    public static Task<AegisTestHost> StartAsync<TContext>(
         Action<DbContextOptionsBuilder> configureDbContext,
         Action<AegisAuthOptions>? configure = null,
         Action<AegisAuthEndpointMapOptions>? configureEndpoints = null,
         Action<IServiceCollection>? configureServices = null,
         Action<WebApplication>? configureApp = null,
         Uri? baseAddress = null)
+        where TContext : DbContext, IAuthDbContext =>
+        StartCoreAsync<TContext>(
+            configureDbContext, keepAlive: null, configure, configureEndpoints, configureServices,
+            configureApp, baseAddress, timeProvider: null, configureAegis: null);
+
+    private static async Task<AegisTestHost> StartCoreAsync<TContext>(
+        Action<DbContextOptionsBuilder> configureDbContext,
+        SqliteConnection? keepAlive,
+        Action<AegisAuthOptions>? configure,
+        Action<AegisAuthEndpointMapOptions>? configureEndpoints,
+        Action<IServiceCollection>? configureServices,
+        Action<WebApplication>? configureApp,
+        Uri? baseAddress,
+        FakeTimeProvider? timeProvider,
+        Action<IAegisAuthBuilder>? configureAegis)
         where TContext : DbContext, IAuthDbContext
     {
         WebApplicationBuilder builder = WebApplication.CreateBuilder(new WebApplicationOptions
@@ -78,9 +110,19 @@ internal sealed class AegisTestHost : IAsyncDisposable
             }
         });
 
-        builder.Services.AddDbContext<TContext>(configureDbContext);
+        builder.Services.AddDbContext<TContext>((sp, o) =>
+        {
+            configureDbContext(o);
+            o.UseAegisAuth(sp);
+        });
         builder.Services.AddDistributedMemoryCache();
-        builder.Services.AddAegisAuth<TContext>(options =>
+        if (timeProvider is not null)
+        {
+            // Registered before AddAegisAuth so its TryAddSingleton(TimeProvider.System) is skipped.
+            builder.Services.AddSingleton<TimeProvider>(timeProvider);
+        }
+
+        IAegisAuthBuilder aegis = builder.Services.AddAegisAuth<TContext>(options =>
         {
             options.AppName = "AegisHttpTest";
             options.BaseURL = baseAddress?.GetLeftPart(UriPartial.Authority) ?? "http://localhost";
@@ -93,10 +135,16 @@ internal sealed class AegisTestHost : IAsyncDisposable
             };
             configure?.Invoke(options);
         });
+        configureAegis?.Invoke(aegis);
 
         configureServices?.Invoke(builder.Services);
 
         WebApplication app = builder.Build();
+        using (IServiceScope scope = app.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<TContext>().Database.EnsureCreated();
+        }
+
         app.Use((context, next) =>
         {
             if (context.Request.Headers.TryGetValue(ClientIpHeader, out var clientIp))
@@ -112,7 +160,7 @@ internal sealed class AegisTestHost : IAsyncDisposable
         configureApp?.Invoke(app);
 
         await app.StartAsync();
-        return new AegisTestHost(app);
+        return new AegisTestHost(app, keepAlive);
     }
 
     public async ValueTask DisposeAsync()
@@ -120,5 +168,9 @@ internal sealed class AegisTestHost : IAsyncDisposable
         Client.Dispose();
         await _app.StopAsync();
         await _app.DisposeAsync();
+        if (_keepAlive is not null)
+        {
+            await _keepAlive.DisposeAsync();
+        }
     }
 }

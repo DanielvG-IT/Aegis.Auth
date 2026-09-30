@@ -15,7 +15,7 @@ namespace Aegis.Auth.Sample.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.7");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
 
             modelBuilder.Entity("Aegis.Auth.Entities.Account", b =>
                 {
@@ -73,6 +73,26 @@ namespace Aegis.Auth.Sample.Migrations
                     b.HasIndex("UserId", "ProviderId");
 
                     b.ToTable("Accounts");
+                });
+
+            modelBuilder.Entity("Aegis.Auth.Entities.AegisKeyValue", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Key");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.ToTable("AegisKeyValues");
                 });
 
             modelBuilder.Entity("Aegis.Auth.Entities.AuthToken", b =>
