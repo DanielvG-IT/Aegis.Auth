@@ -17,6 +17,7 @@ using Aegis.Auth.Features.SignOut;
 using Aegis.Auth.Features.SignUp;
 using Aegis.Auth.Infrastructure.Auth;
 using Aegis.Auth.Infrastructure.Cookies;
+using Aegis.Auth.Infrastructure.EntityFramework;
 using Aegis.Auth.Infrastructure.Tokens;
 using Aegis.Auth.Options;
 using Aegis.Auth.Plugins;
@@ -115,6 +116,7 @@ namespace Aegis.Auth.Extensions
             // AddAegisDatabaseSecondaryStorage() or a custom IAegisSecondaryStorage replaces it.
             services.TryAddSingleton<IAegisSecondaryStorage, InMemorySecondaryStorage>();
             services.AddHostedService<SecondaryStorageStartupDiagnostics>();
+            services.AddHostedService<PluginModelStartupCheck>();
 
             var builder = new AegisAuthBuilder(services, registry);
             builder.AddPlugin(new EmailVerificationPlugin());
@@ -210,6 +212,14 @@ namespace Aegis.Auth.Extensions
 
                 foreach (AegisPlugin plugin in registry.Plugins)
                 {
+                    foreach (var dependency in plugin.Dependencies)
+                    {
+                        if (registry.Plugins.Any(p => string.Equals(p.Id, dependency, StringComparison.Ordinal)) is false)
+                        {
+                            errors.Add($"Aegis plugin '{plugin.Id}' requires plugin '{dependency}'. Register it with AddPlugin.");
+                        }
+                    }
+
                     plugin.Validate(options, errors);
                 }
 

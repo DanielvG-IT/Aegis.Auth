@@ -185,7 +185,8 @@ app.MapAegisAuthEndpoints();
 - Plugin ids are unique; registering one twice fails at startup. So does a plugin route that collides with a core route or another plugin's route.
 - Plugin option validation runs with the core validation, so the app fails to start with every message at once.
 - Plugin error codes get their own HTTP status in the ProblemDetails response (`errorCode` extension).
-- Plugins that add tables need `UseAegisAuth` on the `DbContext` (see above) and a migration.
+- Plugins that add tables need `UseAegisAuth` on the `DbContext` (see above) and a migration; without `UseAegisAuth` the app fails to start.
+- A plugin can require another (e.g. SSO requires organizations); a missing dependency fails at startup.
 - Email verification is a built-in plugin (`EmailVerificationPlugin`, id `email-verification`), registered by `AddAegisAuth`.
 
 Writing a plugin is described in [`AGENTS.md`](AGENTS.md#writing-a-plugin).
@@ -193,6 +194,8 @@ Writing a plugin is described in [`AGENTS.md`](AGENTS.md#writing-a-plugin).
 > **Upgrading:** `AddAegisAuth<TContext>()` now returns `IAegisAuthBuilder` instead of `IServiceCollection`.
 > The builder is an `IServiceCollection` too, so existing code compiles unchanged, but libraries compiled
 > against the old signature must be rebuilt.
+>
+> `AegisAuthContext` has a new required `SessionId`. Code that constructs it itself (e.g. in tests) must set it.
 
 ## Rate limiting
 

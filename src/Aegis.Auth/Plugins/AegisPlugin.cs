@@ -19,6 +19,12 @@ public abstract class AegisPlugin
     public abstract string Id { get; }
 
     /// <summary>
+    /// Ids of plugins this one builds on, e.g. <c>["organization"]</c> for SSO or teams. Startup fails when one
+    /// of them is not registered. Registration order does not matter.
+    /// </summary>
+    public virtual IEnumerable<string> Dependencies => [];
+
+    /// <summary>
     /// Registers the plugin's services. Called once, when the plugin is added.
     /// </summary>
     public virtual void ConfigureServices(IServiceCollection services) { }
@@ -27,6 +33,7 @@ public abstract class AegisPlugin
     /// Adds the plugin's entities, indexes and shadow properties. Runs after the core model and before the
     /// app's <c>OnModelCreating</c>, for contexts configured with <c>UseAegisAuth</c>. The result is cached
     /// per context type and plugin set, so it must not depend on anything but the plugin's own configuration.
+    /// When a plugin overrides this, startup fails unless the Aegis context is configured with <c>UseAegisAuth</c>.
     /// </summary>
     public virtual void ConfigureModel(ModelBuilder modelBuilder) { }
 
