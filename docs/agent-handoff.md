@@ -1,7 +1,7 @@
 # Agent handoff: open work on Aegis.Auth
 
 For the next coding agent. Read `AGENTS.md` first; this file adds the branch rules, the current state of `canary`, and a work queue.
-Last updated 2026-09-30, at `canary` 2978e3a.
+Last updated 2026-09-30, after #167.
 
 ## Rule 1: everything goes to `canary`
 
@@ -33,18 +33,24 @@ The 3 skipped tests at the time of writing are expected: 2 parallel tests for th
 - There is no Docker daemon, so Testcontainers tests (Keycloak, PostgreSQL benchmarks) skip or can't run. Say so in the PR instead of claiming they pass.
 - `gh` isn't installed; use the GitHub MCP tools.
 
-## Done on `canary`, but the issue is still open
+## State of the roadmap
 
-Verify, tick the acceptance criteria, and close each of these (or leave the follow-up noted):
+**Closed (done on `canary`):**
+- #121 atomic tokens (#158)
+- #99 TimeProvider (#160)
+- #95 plugin contract (#164)
+- #106 SAML library ADR (#163)
+- #116 OpenIddict ADR (#162)
+- #67 benchmarks (#166)
 
-| Issue | Merged in | Follow-up before closing |
+**Partly done, still open.** Finish these, or check them off, before building on them:
+
+| Issue | Merged so far | What's left |
 |---|---|---|
-| #95 plugin contract | #164 | None; close |
-| #98 secondary storage | #159 | Redis package (`Aegis.Auth.Redis`, Testcontainers; needs Docker); moving rate limiting and session caching onto it is tracked in #120 and #141. Decide: close with follow-up issues, or keep open |
-| #100 organizations core | #165 | Needs #97 (`RequireAegisPermission` resolver instead of `RequireOrganizationPermission`) and #55 (emit `OrganizationCreated`, `MemberAdded`, `MemberRemoved`, `MemberRoleChanged`). Keep open until those land, or split them into follow-up issues |
-| #106 SAML library spike | #163 | None; close. Its PR body holds the validation checklist for #107 |
-| #116 OpenIddict spike | #162 | None; close. `docs/adr/0002-oidc-provider-engine.md` holds the gap list for #117, #118 and #119 |
-| #67 benchmarks | #166 | Check its acceptance criteria (the CI benchmark comment job may still be missing) |
+| #98 secondary storage | #159: `IAegisSecondaryStorage` with in-memory, database and `IDistributedCache` implementations | The `Aegis.Auth.Redis` package (Testcontainers, needs Docker). Moving rate limiting and session caching onto it is tracked in #120 and #141 |
+| #100 organizations core | #165: the `Aegis.Auth.Organizations` plugin with all endpoints and tests | After #97: replace `RequireOrganizationPermission` with a role resolver for `RequireAegisPermission` (active organization). After #55: emit `OrganizationCreated`, `MemberAdded`, `MemberRemoved`, `MemberRoleChanged` |
+
+When you close an issue, update this section in the same PR.
 
 ## Known follow-ups from the last session
 
@@ -59,8 +65,8 @@ Always read the issue itself: each lists its dependencies, scope and acceptance 
 
 ### 1. Foundations: unblock everything else
 - **#120** fix(security): rate limiting is registered but never enforced. A bug, and plugin rules already exist in `AegisPluginRegistry.RateLimitRules`.
-- **#97** access control primitives. Unblocks #100's role resolver, #103, #114, #69.
-- **#55** lifecycle hooks / events. Unblocks the organization events, audit log (#61) and billing.
+- **#97** access control primitives. Unblocks #100's role resolver, #103, #114, #69. Finish #100 right after it.
+- **#55** lifecycle hooks / events. Unblocks the organization events (#100), audit log (#61) and billing.
 - **#96** schema extensibility: extra User/Session columns, transactions. Organizations already uses shadow properties and `GetDbContext()`; formalize them here.
 - **#57** advanced cookie configuration.
 
@@ -74,7 +80,7 @@ Always read the issue itself: each lists its dependencies, scope and acceptance 
 ### 3. Security hardening (Epic #91)
 - #122 constant-time responses, #123 CAPTCHA, #124 Have I Been Pwned check
 
-### 4. Enterprise and B2B (Epic #89). Needs #100 (done), #97 and #55
+### 4. Enterprise and B2B (Epic #89). Needs #97 and #55; #100 core is on canary
 - #101 invitations (single-use: `TryConsumeAsync`), #102 teams, #103 dynamic roles
 - #104 SSO foundation → #105 enterprise OIDC SSO, #107 SAML SP (ITfoxtec, per ADR 0001) → #108 domain verification → #109 SSO enforcement
 - #110 SCIM Users → #111 SCIM Groups
