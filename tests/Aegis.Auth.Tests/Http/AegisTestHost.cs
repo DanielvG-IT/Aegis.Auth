@@ -3,6 +3,7 @@ using System.Net;
 using Aegis.Auth.Extensions;
 using Aegis.Auth.Http.Extensions;
 using Aegis.Auth.Options;
+using Aegis.Auth.Plugins;
 using Aegis.Auth.Tests.Helpers;
 
 using Microsoft.AspNetCore.Builder;
@@ -44,7 +45,8 @@ internal sealed class AegisTestHost : IAsyncDisposable
         Action<AegisAuthOptions>? configure = null,
         Action<AegisAuthEndpointMapOptions>? configureEndpoints = null,
         Action<IServiceCollection>? configureServices = null,
-        FakeTimeProvider? timeProvider = null)
+        FakeTimeProvider? timeProvider = null,
+        Action<IAegisAuthBuilder>? configureAegis = null)
     {
         WebApplicationBuilder builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
@@ -57,7 +59,7 @@ internal sealed class AegisTestHost : IAsyncDisposable
         var connectionString = $"Data Source=AegisHttpTest_{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
         var keepAlive = new SqliteConnection(connectionString);
         keepAlive.Open();
-        builder.Services.AddDbContext<TestDbContext>(o => o.UseSqlite(connectionString));
+        builder.Services.AddDbContext<TestDbContext>((sp, o) => o.UseSqlite(connectionString).UseAegisAuth(sp));
         builder.Services.AddDistributedMemoryCache();
         if (timeProvider is not null)
         {
@@ -65,7 +67,7 @@ internal sealed class AegisTestHost : IAsyncDisposable
             builder.Services.AddSingleton<TimeProvider>(timeProvider);
         }
 
-        builder.Services.AddAegisAuth<TestDbContext>(options =>
+        IAegisAuthBuilder aegis = builder.Services.AddAegisAuth<TestDbContext>(options =>
         {
             options.AppName = "AegisHttpTest";
             options.BaseURL = "http://localhost";
@@ -78,6 +80,7 @@ internal sealed class AegisTestHost : IAsyncDisposable
             };
             configure?.Invoke(options);
         });
+        configureAegis?.Invoke(aegis);
 
         configureServices?.Invoke(builder.Services);
 

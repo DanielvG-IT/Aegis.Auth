@@ -17,8 +17,10 @@ using Aegis.Auth.Features.SignOut;
 using Aegis.Auth.Features.SignUp;
 using Aegis.Auth.Infrastructure.Auth;
 using Aegis.Auth.Infrastructure.Cookies;
+using Aegis.Auth.Infrastructure.EntityFramework;
 using Aegis.Auth.Infrastructure.Tokens;
 using Aegis.Auth.Options;
+using Aegis.Auth.Plugins;
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OAuth;
@@ -55,13 +57,19 @@ namespace Aegis.Auth.Extensions
 {
     public static class ServiceCollectionExtensions
     {
-        public static IServiceCollection AddAegisAuth<TContext>(
+        /// <summary>
+        /// Registers Aegis and its built-in plugins. Add more plugins with
+        /// <see cref="IAegisAuthBuilder.AddPlugin"/> on the returned builder.
+        /// </summary>
+        public static IAegisAuthBuilder AddAegisAuth<TContext>(
             this IServiceCollection services,
             Action<AegisAuthOptions>? configure = null)
             where TContext : class, IAuthDbContext
         {
             ArgumentNullException.ThrowIfNull(services);
 
+            var registry = new AegisPluginRegistry();
+            services.AddSingleton(registry);
             services.AddSingleton<IValidateOptions<AegisAuthOptions>, AegisAuthOptionsValidator>();
             services
                 .AddOptions<AegisAuthOptions>()
@@ -98,7 +106,6 @@ namespace Aegis.Auth.Extensions
             services.AddScoped<ISignOutService, SignOutService>();
             services.AddScoped<IAegisAuthContextAccessor, AegisAuthContextAccessor>();
             services.AddScoped<ICsrfTokenService, CsrfTokenService>();
-            services.AddScoped<IEmailVerificationService, EmailVerificationService>();
             services.AddScoped<IAuthTokenStore, AuthTokenStore>();
             services.AddScoped<IPasswordResetService, PasswordResetService>();
             services.AddScoped<ITokenEncryptionService, TokenEncryptionService>();
@@ -109,11 +116,14 @@ namespace Aegis.Auth.Extensions
             // AddAegisDatabaseSecondaryStorage() or a custom IAegisSecondaryStorage replaces it.
             services.TryAddSingleton<IAegisSecondaryStorage, InMemorySecondaryStorage>();
             services.AddHostedService<SecondaryStorageStartupDiagnostics>();
+            services.AddHostedService<PluginModelStartupCheck>();
 
-            return services;
+            var builder = new AegisAuthBuilder(services, registry);
+            builder.AddPlugin(new EmailVerificationPlugin());
+            return builder;
         }
 
-        private sealed class AegisAuthOptionsValidator : IValidateOptions<AegisAuthOptions>
+        private sealed class AegisAuthOptionsValidator(AegisPluginRegistry registry) : IValidateOptions<AegisAuthOptions>
         {
             public ValidateOptionsResult Validate(string? name, AegisAuthOptions options)
             {
@@ -148,7 +158,10 @@ namespace Aegis.Auth.Extensions
                     errors.Add("AegisAuthOptions.EmailAndPassword.MaxPasswordLength must be greater than or equal to MinPasswordLength.");
                 }
 
-                ValidateEmailDeliveryOptions(options, errors);
+                if (options.EmailAndPassword.ResetPasswordTokenExpiresIn <= 0)
+                {
+                    errors.Add("AegisAuthOptions.EmailAndPassword.ResetPasswordTokenExpiresIn must be greater than 0.");
+                }
 
                 if (options.AccountLockout.Enabled)
                 {
@@ -197,34 +210,20 @@ namespace Aegis.Auth.Extensions
                     }
                 }
 
+                foreach (AegisPlugin plugin in registry.Plugins)
+                {
+                    foreach (var dependency in plugin.Dependencies)
+                    {
+                        if (registry.Plugins.Any(p => string.Equals(p.Id, dependency, StringComparison.Ordinal)) is false)
+                        {
+                            errors.Add($"Aegis plugin '{plugin.Id}' requires plugin '{dependency}'. Register it with AddPlugin.");
+                        }
+                    }
+
+                    plugin.Validate(options, errors);
+                }
+
                 return errors.Count > 0 ? ValidateOptionsResult.Fail(errors) : ValidateOptionsResult.Success;
-            }
-
-            private static void ValidateEmailDeliveryOptions(AegisAuthOptions options, List<string> errors)
-            {
-                EmailVerificationOptions verification = options.EmailVerification;
-                if (verification.SendVerificationEmail is null)
-                {
-                    if (options.EmailAndPassword.RequireEmailVerification)
-                    {
-                        errors.Add("AegisAuthOptions.EmailVerification.SendVerificationEmail must be configured when EmailAndPassword.RequireEmailVerification is enabled.");
-                    }
-
-                    if (verification.SendOnSignUp is true || verification.SendOnSignIn is true)
-                    {
-                        errors.Add("AegisAuthOptions.EmailVerification.SendVerificationEmail must be configured when SendOnSignUp or SendOnSignIn is enabled.");
-                    }
-                }
-
-                if (verification.ExpiresIn <= 0)
-                {
-                    errors.Add("AegisAuthOptions.EmailVerification.ExpiresIn must be greater than 0.");
-                }
-
-                if (options.EmailAndPassword.ResetPasswordTokenExpiresIn <= 0)
-                {
-                    errors.Add("AegisAuthOptions.EmailAndPassword.ResetPasswordTokenExpiresIn must be greater than 0.");
-                }
             }
 
             private static void ValidateOAuthProviderOptions(AegisAuthOptions options, List<string> errors)

@@ -29,6 +29,7 @@ This is v0.1 — actively developed. The feature set below reflects what is **ac
 - OAuth (Google, GitHub, Microsoft, Apple) with account linking and PKCE (S256) by default
 - Rate limiting per client IP and per email (see [Rate limiting](#rate-limiting))
 - Secondary storage (`IAegisSecondaryStorage`): short-lived key/value state with TTL, atomic increments and set-if-not-exists; in-memory, database or `IDistributedCache` backed (see [Secondary storage](#secondary-storage))
+- Plugin contract: features contribute services, EF model, endpoints, error codes, rate-limit rules and startup validation (see [Plugins](#plugins)). Email verification is built on it.
 
 ### Known gaps
 
@@ -154,6 +155,48 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 }
 ```
 
+`ApplyAegisAuthModel` maps the core entities only. To also get the tables of registered plugins, add
+`UseAegisAuth(sp)` after the database provider:
+
+```csharp
+builder.Services.AddDbContext<AppDbContext>((sp, options) =>
+    options.UseSqlite(connectionString).UseAegisAuth(sp));
+```
+
+With `UseAegisAuth`, Aegis applies the core model (with OAuth tokens encrypted at rest) and every plugin's
+model before your `OnModelCreating` runs, so your own configuration still wins. You can drop the
+`ApplyAegisAuthModel` call; keeping it is harmless. Call `UseAegisAuth` after the provider (`UseSqlite`,
+`UseSqlServer`, …), otherwise it throws.
+
+## Plugins
+
+`AddAegisAuth<TContext>()` returns an `IAegisAuthBuilder`. Plugins are added on it, usually through an
+extension method the plugin ships:
+
+```csharp
+builder.Services
+    .AddAegisAuth<AppDbContext>(options => { /* ... */ })
+    .AddPlugin(new MyPlugin());
+
+// Plugin endpoints are mapped under the Aegis base path, after the core endpoints.
+app.MapAegisAuthEndpoints();
+```
+
+- Plugin ids are unique; registering one twice fails at startup. So does a plugin route that collides with a core route or another plugin's route.
+- Plugin option validation runs with the core validation, so the app fails to start with every message at once.
+- Plugin error codes get their own HTTP status in the ProblemDetails response (`errorCode` extension).
+- Plugins that add tables need `UseAegisAuth` on the `DbContext` (see above) and a migration; without `UseAegisAuth` the app fails to start.
+- A plugin can require another (e.g. SSO requires organizations); a missing dependency fails at startup.
+- Email verification is a built-in plugin (`EmailVerificationPlugin`, id `email-verification`), registered by `AddAegisAuth`.
+
+Writing a plugin is described in [`AGENTS.md`](AGENTS.md#writing-a-plugin).
+
+> **Upgrading:** `AddAegisAuth<TContext>()` now returns `IAegisAuthBuilder` instead of `IServiceCollection`.
+> The builder is an `IServiceCollection` too, so existing code compiles unchanged, but libraries compiled
+> against the old signature must be rebuilt.
+>
+> `AegisAuthContext` has a new required `SessionId`. Code that constructs it itself (e.g. in tests) must set it.
+
 ## Rate limiting
 
 Enabled by default. Rejected requests get `429 Too Many Requests` with a problem details body whose `errorCode` is `TOO_MANY_REQUESTS`.
@@ -211,7 +254,7 @@ Secondary storage logs use event IDs 9000–9999.
 
 ```
 src/
-  Aegis.Auth/          — Core: entities, services, crypto, options
+  Aegis.Auth/          — Core: entities, services, crypto, options, plugin contract
   Aegis.Auth.Http/     — HTTP endpoints, protection extensions
 
 tests/

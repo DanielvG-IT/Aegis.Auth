@@ -1,13 +1,15 @@
-using Aegis.Auth.Http.Features.EmailVerification;
+using Aegis.Auth.Features.EmailVerification;
 using Aegis.Auth.Http.Features.PasswordReset;
 using Aegis.Auth.Http.Features.SignIn;
 using Aegis.Auth.Http.Features.SignOut;
 using Aegis.Auth.Http.Features.SignUp;
 using Aegis.Auth.Options;
+using Aegis.Auth.Plugins;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.Routing.Patterns;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -24,6 +26,8 @@ public sealed class AegisAuthEndpointMapOptions
     public bool MapEmailSignUp { get; set; } = true;
     public bool MapOAuthSignIn { get; set; } = true;
     public bool MapPasswordReset { get; set; } = true;
+
+    // Maps the built-in email verification plugin.
     public bool MapEmailVerification { get; set; } = true;
 
     // true: derive defaults from AegisAuthOptions feature flags.
@@ -98,17 +102,90 @@ public static class AegisAuthEndpointRouteBuilderExtensions
             group.MapPasswordReset();
         }
 
-        var canMapEmailVerification = mapOptions.MapEmailVerification;
-        if (mapOptions.RespectConfiguration)
-        {
-            canMapEmailVerification = canMapEmailVerification && authOptions.EmailVerification.SendVerificationEmail is not null;
-        }
-
-        if (canMapEmailVerification)
-        {
-            group.MapEmailVerification();
-        }
+        MapPluginEndpoints(endpoints, group, mapOptions, authOptions);
 
         return endpoints;
     }
+
+    /// <summary>
+    /// Maps each plugin into its own sub-group of the Aegis group, so its routes can be told apart
+    /// and checked against the core routes and every earlier plugin.
+    /// </summary>
+    private static void MapPluginEndpoints(
+        IEndpointRouteBuilder endpoints,
+        RouteGroupBuilder group,
+        AegisAuthEndpointMapOptions mapOptions,
+        AegisAuthOptions authOptions)
+    {
+        AegisPluginRegistry registry = endpoints.ServiceProvider.GetRequiredService<AegisPluginRegistry>();
+
+        var mappedRoutes = new Dictionary<string, List<(string Methods, string Owner)>>(StringComparer.OrdinalIgnoreCase);
+        foreach (RouteEndpoint endpoint in GetRouteEndpoints(group))
+        {
+            AddRoute(mappedRoutes, endpoint, "Aegis core");
+        }
+
+        foreach (AegisPlugin plugin in registry.Plugins)
+        {
+            if (plugin.Id == EmailVerificationPlugin.PluginId && mapOptions.MapEmailVerification is false)
+            {
+                continue;
+            }
+
+            if (mapOptions.RespectConfiguration && plugin.ShouldMapEndpoints(authOptions) is false)
+            {
+                continue;
+            }
+
+            RouteGroupBuilder pluginGroup = group.MapGroup(string.Empty);
+            plugin.MapEndpoints(pluginGroup);
+
+            foreach (RouteEndpoint endpoint in GetRouteEndpoints(pluginGroup))
+            {
+                AddRoute(mappedRoutes, endpoint, $"plugin '{plugin.Id}'");
+            }
+        }
+    }
+
+    private static IEnumerable<RouteEndpoint> GetRouteEndpoints(IEndpointRouteBuilder builder) =>
+        builder.DataSources.SelectMany(source => source.Endpoints).OfType<RouteEndpoint>();
+
+    private static void AddRoute(
+        Dictionary<string, List<(string Methods, string Owner)>> mappedRoutes,
+        RouteEndpoint endpoint,
+        string owner)
+    {
+        var path = NormalizeRoute(endpoint.RoutePattern);
+        IReadOnlyList<string>? methods = endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods;
+        var methodList = methods is null || methods.Count == 0 ? "*" : string.Join(",", methods);
+
+        if (mappedRoutes.TryGetValue(path, out List<(string Methods, string Owner)>? existing) is false)
+        {
+            mappedRoutes[path] = [(methodList, owner)];
+            return;
+        }
+
+        foreach ((var existingMethods, var existingOwner) in existing)
+        {
+            if (MethodsOverlap(existingMethods, methodList))
+            {
+                throw new InvalidOperationException(
+                    $"Aegis route conflict: {owner} maps {methodList} '{endpoint.RoutePattern.RawText}', which {existingOwner} already maps ({existingMethods}).");
+            }
+        }
+
+        existing.Add((methodList, owner));
+    }
+
+    private static bool MethodsOverlap(string left, string right) =>
+        left == "*" || right == "*" || left.Split(',').Intersect(right.Split(','), StringComparer.OrdinalIgnoreCase).Any();
+
+    // Parameter names don't matter for matching, so '/{id}' and '/{userId}' collide.
+    private static string NormalizeRoute(RoutePattern pattern) =>
+        "/" + string.Join("/", pattern.PathSegments.Select(segment => string.Concat(segment.Parts.Select(part => part switch
+        {
+            RoutePatternLiteralPart literal => literal.Content,
+            RoutePatternSeparatorPart separator => separator.Content,
+            _ => "{}",
+        }))));
 }

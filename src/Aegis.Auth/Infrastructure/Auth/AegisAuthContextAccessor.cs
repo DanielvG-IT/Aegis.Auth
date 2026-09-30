@@ -43,6 +43,7 @@ internal sealed class AegisAuthContextAccessor(SessionCookieHandler cookieHandle
             return new AegisAuthContext
             {
                 UserId = cookieCache.User.Id,
+                SessionId = cookieCache.Session.Id,
                 SessionToken = sessionToken,
                 ExpiresAt = cookieCache.Session.ExpiresAt,
                 IsFromCookieCache = true,
@@ -64,6 +65,7 @@ internal sealed class AegisAuthContextAccessor(SessionCookieHandler cookieHandle
         return new AegisAuthContext
         {
             UserId = session.UserId,
+            SessionId = session.Id,
             SessionToken = sessionToken, // return the raw cookie token, not the DB hash
             ExpiresAt = session.ExpiresAt,
             IsFromCookieCache = false,

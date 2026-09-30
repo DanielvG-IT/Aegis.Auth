@@ -4,6 +4,7 @@
     <Project Path="src/Aegis.Auth.Http/Aegis.Auth.Http.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Aegis.Auth.TestPlugins/Aegis.Auth.TestPlugins.csproj" />
     <Project Path="tests/Aegis.Auth.Tests/Aegis.Auth.Tests.csproj" />
   </Folder>
   <Folder Name="/samples/">
