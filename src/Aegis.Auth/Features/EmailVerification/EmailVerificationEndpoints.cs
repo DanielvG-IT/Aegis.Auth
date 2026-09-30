@@ -1,15 +1,14 @@
 using Aegis.Auth.Abstractions;
 using Aegis.Auth.Constants;
 using Aegis.Auth.Entities;
-using Aegis.Auth.Features.EmailVerification;
 using Aegis.Auth.Features.RateLimit;
-using Aegis.Auth.Http.Internal;
+using Aegis.Auth.Plugins;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace Aegis.Auth.Http.Features.EmailVerification;
+namespace Aegis.Auth.Features.EmailVerification;
 
 internal static class EmailVerificationEndpoints
 {
@@ -45,7 +44,7 @@ internal static class EmailVerificationEndpoints
             User? user = await dbContext.Users.FindAsync([context.UserId], cancellationToken);
             if (user is null)
             {
-                return AegisHttpResultMapper.MapError(httpContext, AuthErrors.Session.SessionNotFound, "Session user not found.");
+                return AegisResults.Problem(httpContext, AuthErrors.Session.SessionNotFound, "Session user not found.");
             }
 
             result = await emailVerificationService.SendVerificationEmailAsync(user, cancellationToken);
@@ -57,7 +56,7 @@ internal static class EmailVerificationEndpoints
 
         if (result.IsSuccess is false)
         {
-            return AegisHttpResultMapper.MapError(httpContext, result.ErrorCode, result.Message);
+            return AegisResults.Problem(httpContext, result.ErrorCode, result.Message);
         }
 
         return Results.Ok(new { message = "If the account exists and is not yet verified, a verification email has been sent." });
@@ -72,7 +71,7 @@ internal static class EmailVerificationEndpoints
         Result<User> result = await emailVerificationService.VerifyEmailAsync(request.Token, cancellationToken);
         if (result.IsSuccess is false)
         {
-            return AegisHttpResultMapper.MapError(httpContext, result.ErrorCode, result.Message);
+            return AegisResults.Problem(httpContext, result.ErrorCode, result.Message);
         }
 
         return Results.Ok(new { message = "Email verified successfully." });

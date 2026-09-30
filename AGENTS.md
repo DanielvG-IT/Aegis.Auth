@@ -7,8 +7,8 @@ The roadmap lives in [#86](https://github.com/DanielvG-IT/Aegis.Auth/issues/86);
 
 | Path | What lives there |
 |---|---|
-| `src/Aegis.Auth` | Core: entities (`Entities/`), options (`Options/`), one folder per feature with its service (`Features/<Feature>/`), EF model (`Extensions/ModelBuilderExtensions.cs`), DI + startup validation (`Extensions/ServiceCollectionExtensions.cs`), crypto (`Core/Crypto/`), error codes (`Constants/ErrorCodes.cs`), log messages (`Logging/LogMessages.cs`) |
-| `src/Aegis.Auth.Http` | Minimal-API endpoints (`Features/<Feature>/*Endpoints.cs`), endpoint mapping (`Extensions/AegisAuthEndpointRouteBuilderExtensions.cs`), error → ProblemDetails mapping (`Internal/AegisHttpResultMapper.cs`) |
+| `src/Aegis.Auth` | Core: entities (`Entities/`), options (`Options/`), one folder per feature with its service (`Features/<Feature>/`), EF model (`Extensions/ModelBuilderExtensions.cs`), DI + startup validation (`Extensions/ServiceCollectionExtensions.cs`), crypto (`Core/Crypto/`), error codes (`Constants/ErrorCodes.cs`), log messages (`Logging/LogMessages.cs`), plugin contract (`Plugins/`), EF model integration for plugins (`Infrastructure/EntityFramework/`) |
+| `src/Aegis.Auth.Http` | Minimal-API endpoints (`Features/<Feature>/*Endpoints.cs`), endpoint mapping (`Extensions/AegisAuthEndpointRouteBuilderExtensions.cs`), error → ProblemDetails mapping (`Internal/AegisHttpResultMapper.cs`, which delegates to `Plugins/AegisResults.cs` in core) |
 | `tests/Aegis.Auth.Tests` | xUnit. Service tests use strict Moq mocks + EF InMemory or SQLite in-memory (`Helpers/ServiceTestFixture.cs`, `Helpers/TestDbContext.cs`); HTTP tests use `Http/AegisTestHost.cs` (TestServer on SQLite) |
 | `samples/Aegis.Auth.Sample` | SQLite sample app with EF migrations |
 
@@ -26,7 +26,7 @@ The SDK version is pinned in `global.json`. Sample migrations:
 ## Conventions
 
 - **Services** are `internal sealed` classes behind a public interface and return `Result` / `Result<T>` with a code from `AuthErrors`. Expected failures are results, not exceptions.
-- **Endpoints** are `internal static Map…(this RouteGroupBuilder group)` methods, registered in `MapAegisAuthEndpoints`, gated by `AegisAuthEndpointMapOptions` (and `RespectConfiguration`). Failures go through `AegisHttpResultMapper`, so the client always gets ProblemDetails with the error code. Give new error codes an HTTP status there.
+- **Endpoints** are `internal static Map…(this RouteGroupBuilder group)` methods, registered in `MapAegisAuthEndpoints`, gated by `AegisAuthEndpointMapOptions` (and `RespectConfiguration`). Failures go through `AegisHttpResultMapper` (core and plugin endpoints use `AegisResults.Problem`), so the client always gets ProblemDetails with the error code. Give new core error codes an HTTP status in `AegisPluginRegistry.CoreErrorStatusCodes`; plugins declare theirs in `ErrorStatusCodes`.
 - **Options** are plain classes in `Options/`. New features are **off by default**. Invalid combinations fail at startup with a clear message (see the `Validate…` methods in `ServiceCollectionExtensions`).
 - **Logging** uses source-generated `[LoggerMessage]` methods in `Logging/LogMessages.cs`, one EventId range per feature: 1000 sign-in, 2000 sign-up, 3000 sessions, 4000 sign-out, 5000 password reset, 6000 email verification, 7000 OAuth, 8000 rate limiting, 9000 secondary storage. New features take the next free thousand.
 - **Style** follows `.editorconfig`; `dotnet format` enforces it. Match the surrounding code.
@@ -63,4 +63,59 @@ The SDK version is pinned in `global.json`. Sample migrations:
 
 ## Writing a plugin
 
-The plugin contract is being designed in [#95](https://github.com/DanielvG-IT/Aegis.Auth/issues/95). That issue fills in this section when it lands.
+New features ship as plugins: a public class deriving from `AegisPlugin` (`src/Aegis.Auth/Plugins/AegisPlugin.cs`).
+The reference implementation is `Features/EmailVerification/EmailVerificationPlugin.cs`.
+
+```csharp
+public sealed class OrganizationPlugin(OrganizationOptions options) : AegisPlugin
+{
+    public override string Id => "organization";                        // kebab-case, unique
+
+    public override void ConfigureServices(IServiceCollection services) =>
+        services.AddScoped<IOrganizationService, OrganizationService>(); // internal sealed service
+
+    public override void ConfigureModel(ModelBuilder modelBuilder) =>
+        modelBuilder.Entity<Organization>(e => { e.HasKey(o => o.Id); e.Property(o => o.Slug).HasMaxLength(64); e.HasIndex(o => o.Slug).IsUnique(); });
+
+    public override void MapEndpoints(RouteGroupBuilder group) =>
+        group.MapPost("/organization/create", CreateAsync);              // relative to the Aegis base path
+
+    public override bool ShouldMapEndpoints(AegisAuthOptions options) => true; // e.g. "is a delegate configured?"
+
+    public override IEnumerable<AegisRateLimitRule> RateLimitRules => [new("/organization/create") { MaxRequests = 5 }];
+
+    public override IReadOnlyDictionary<string, int> ErrorStatusCodes { get; } = new Dictionary<string, int>
+    {
+        ["ORGANIZATION_SLUG_TAKEN"] = StatusCodes.Status409Conflict,
+    };
+
+    public override void Validate(AegisAuthOptions options, IList<string> errors)
+    {
+        if (options.EmailAndPassword.Enabled is false) errors.Add("OrganizationOptions: ... must ...");
+    }
+}
+
+public static class OrganizationAegisAuthBuilderExtensions
+{
+    public static IAegisAuthBuilder AddOrganizations(this IAegisAuthBuilder builder, Action<OrganizationOptions>? configure = null)
+    {
+        var options = new OrganizationOptions();
+        configure?.Invoke(options);
+        return builder.AddPlugin(new OrganizationPlugin(options));
+    }
+}
+```
+
+What each member is for, and the rules:
+
+- **`Id`**: kebab-case and unique. A duplicate or malformed id throws when the plugin is added.
+- **`ConfigureServices`**: runs once, when the plugin is added. Services stay `internal sealed` behind a public interface and return `Result`/`Result<T>`.
+- **`ConfigureModel`**: runs after the core model and before the app's `OnModelCreating`, for contexts that call `UseAegisAuth(sp)`. EF caches the model per context type and plugin set, so the model must depend only on the plugin itself. Set `HasMaxLength` on indexed strings and add a sample migration. Endpoints reach plugin tables with `((DbContext)authDbContext).Set<TEntity>()`; `IAuthDbContext` only exposes the core sets.
+- **`MapEndpoints`**: called by `MapAegisAuthEndpoints` after the core endpoints, in registration order, each plugin in its own sub-group. A route that collides with a core route or an earlier plugin's route (same path and method; parameter names ignored) fails at startup. Return failures with `AegisResults.Problem(httpContext, code, message)`.
+- **`ShouldMapEndpoints`**: skip mapping when the feature isn't configured. Ignored when `RespectConfiguration` is off.
+- **`RateLimitRules`**: collected in `AegisPluginRegistry.RateLimitRules`; enforcement is separate ([#98](https://github.com/DanielvG-IT/Aegis.Auth/issues/98)). Until then, also call `RequireAegisRateLimit` on the endpoint.
+- **`ErrorStatusCodes`**: merged with the core map; statuses must be 400–599, and remapping an existing code to a different status throws. Unmapped codes return 400. Add the constants next to the plugin, or to `AuthErrors` for shared codes.
+- **`Validate`**: add one message per invalid setting. It runs with the core validation (`ValidateOnStart`), so the app fails to start with every message at once. New features stay **off by default**.
+
+Tests: register the plugin with `AegisTestHost.StartAsync(configureAegis: a => a.AddPlugin(...))`. The host already calls `UseAegisAuth`. `tests/Aegis.Auth.Tests/Http/PluginContractTests.cs` shows each contract member tested through HTTP.
+Logging: take the next free EventId thousand (see **Conventions**).
