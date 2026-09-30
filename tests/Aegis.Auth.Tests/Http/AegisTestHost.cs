@@ -1,5 +1,6 @@
 using System.Net;
 
+using Aegis.Auth.Abstractions;
 using Aegis.Auth.Extensions;
 using Aegis.Auth.Http.Extensions;
 using Aegis.Auth.Options;
@@ -29,6 +30,7 @@ internal sealed class AegisTestHost : IAsyncDisposable
 
     public HttpClient Client { get; }
     public IServiceProvider Services => _app.Services;
+    public TestServer Server => _app.GetTestServer();
 
     private AegisTestHost(WebApplication app)
     {
@@ -36,24 +38,52 @@ internal sealed class AegisTestHost : IAsyncDisposable
         Client = app.GetTestClient();
     }
 
-    public static async Task<AegisTestHost> StartAsync(
+    public static Task<AegisTestHost> StartAsync(
         Action<AegisAuthOptions>? configure = null,
         Action<AegisAuthEndpointMapOptions>? configureEndpoints = null,
         Action<IServiceCollection>? configureServices = null)
+    {
+        var dbName = $"AegisHttpTest_{Guid.NewGuid():N}";
+        return StartAsync<TestDbContext>(
+            db => db.UseInMemoryDatabase(dbName),
+            configure,
+            configureEndpoints,
+            configureServices);
+    }
+
+    /// <summary>
+    /// Same pipeline over a caller-supplied <typeparamref name="TContext"/>, for tests that need a
+    /// relational provider or extra entities. <paramref name="configureApp"/> maps additional
+    /// endpoints after the Aegis ones; <paramref name="baseAddress"/> sets the scheme and host
+    /// the server sees (and <see cref="AegisAuthOptions.BaseURL"/>).
+    /// </summary>
+    public static async Task<AegisTestHost> StartAsync<TContext>(
+        Action<DbContextOptionsBuilder> configureDbContext,
+        Action<AegisAuthOptions>? configure = null,
+        Action<AegisAuthEndpointMapOptions>? configureEndpoints = null,
+        Action<IServiceCollection>? configureServices = null,
+        Action<WebApplication>? configureApp = null,
+        Uri? baseAddress = null)
+        where TContext : DbContext, IAuthDbContext
     {
         WebApplicationBuilder builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
             EnvironmentName = Environments.Development,
         });
-        builder.WebHost.UseTestServer();
+        builder.WebHost.UseTestServer(o =>
+        {
+            if (baseAddress is not null)
+            {
+                o.BaseAddress = baseAddress;
+            }
+        });
 
-        var dbName = $"AegisHttpTest_{Guid.NewGuid():N}";
-        builder.Services.AddDbContext<TestDbContext>(o => o.UseInMemoryDatabase(dbName));
+        builder.Services.AddDbContext<TContext>(configureDbContext);
         builder.Services.AddDistributedMemoryCache();
-        builder.Services.AddAegisAuth<TestDbContext>(options =>
+        builder.Services.AddAegisAuth<TContext>(options =>
         {
             options.AppName = "AegisHttpTest";
-            options.BaseURL = "http://localhost";
+            options.BaseURL = baseAddress?.GetLeftPart(UriPartial.Authority) ?? "http://localhost";
             options.Secret = "test-secret-that-is-long-enough-for-hmac-256-operations!!";
             options.EmailAndPassword.Enabled = true;
             options.EmailAndPassword.Password = new PasswordOptions
@@ -79,6 +109,7 @@ internal sealed class AegisTestHost : IAsyncDisposable
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapAegisAuthEndpoints(configureEndpoints);
+        configureApp?.Invoke(app);
 
         await app.StartAsync();
         return new AegisTestHost(app);
