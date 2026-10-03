@@ -3,7 +3,7 @@ name: 🔒 Security Vulnerability
 about: Report a security issue (use SECURITY.md for responsible disclosure)
 title: "[Security]: "
 labels: ["security", "triage"]
-assignees: DanielvG-IT
+assignees: danielvanginneken
 ---
 
 > ⚠️ **For sensitive security issues**, please follow the responsible disclosure process in [SECURITY.md](../../SECURITY.md) instead of opening a public issue.

@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Guide for coding agents (and humans) working on Aegis.Auth. Read this before picking up an issue.
-The roadmap lives in [#86](https://github.com/DanielvG-IT/Aegis.Auth/issues/86); every roadmap issue links to its epic and dependencies.
+The roadmap lives in [#86](https://github.com/danielvanginneken/Aegis.Auth/issues/86); every roadmap issue links to its epic and dependencies.
 
 ## Branches
 
@@ -41,7 +41,7 @@ The SDK version is pinned in `global.json`. Sample migrations:
 
 1. Only SHA-256 hashes of tokens are stored (`AegisCrypto.HashToken`). Raw tokens go to delivery delegates or signed cookies, **never** to HTTP response bodies or logs.
 2. Endpoints that take an identifier (email, username, phone) respond identically whether or not the account exists.
-3. Single-use tokens and codes are consumed **atomically** (conditional update), never read-check-write. See [#121](https://github.com/DanielvG-IT/Aegis.Auth/issues/121). Every single-use flow (password reset, email verification, and future magic links, email OTPs, invitations, device codes, one-time tokens) redeems through `IAuthTokenStore.TryConsumeAsync` (`Infrastructure/Tokens/AuthTokenStore.cs`), which runs the dependent writes in the same transaction. Counters such as `FailedSignInCount` are incremented with `ExecuteUpdateAsync`, not read-increment-write.
+3. Single-use tokens and codes are consumed **atomically** (conditional update), never read-check-write. See [#121](https://github.com/danielvanginneken/Aegis.Auth/issues/121). Every single-use flow (password reset, email verification, and future magic links, email OTPs, invitations, device codes, one-time tokens) redeems through `IAuthTokenStore.TryConsumeAsync` (`Infrastructure/Tokens/AuthTokenStore.cs`), which runs the dependent writes in the same transaction. Counters such as `FailedSignInCount` are incremented with `ExecuteUpdateAsync`, not read-increment-write.
 4. Redirect and callback URLs go through `CallbackValidator` (`TrustedOrigins`).
 5. Third-party secrets at rest are encrypted with `ITokenEncryptionService`.
 6. Never hand-roll protocol or crypto validation (XML signatures, JWT validation, WebAuthn). Use vetted libraries.
@@ -120,7 +120,7 @@ What each member is for, and the rules:
 - **`ConfigureModel`**: runs after the core model and before the app's `OnModelCreating`, for contexts that call `UseAegisAuth(sp)`. EF caches the model per context type and plugin set, so the model must depend only on the plugin itself. Set `HasMaxLength` on indexed strings and add a sample migration. Startup fails when a plugin overrides it but the context lacks `UseAegisAuth`. Endpoints reach plugin tables, shadow properties and transactions through `authDbContext.GetDbContext()` (`Set<TEntity>()`, `Entry(…).Property("…")`, `Database`); `IAuthDbContext` only exposes the core sets. Columns a plugin adds to core entities are shadow properties (e.g. `modelBuilder.Entity<Session>().Property<string?>("ActiveOrganizationId")`).
 - **`MapEndpoints`**: called by `MapAegisAuthEndpoints` after the core endpoints, in registration order, each plugin in its own sub-group. A route that collides with a core route or an earlier plugin's route (same path and method; parameter names ignored) fails at startup. Return failures with `AegisResults.Problem(httpContext, code, message)`.
 - **`ShouldMapEndpoints`**: skip mapping when the feature isn't configured. Ignored when `RespectConfiguration` is off.
-- **`RateLimitRules`**: collected in `AegisPluginRegistry.RateLimitRules`; enforcement is separate ([#120](https://github.com/DanielvG-IT/Aegis.Auth/issues/120)). Until then, also call `RequireAegisRateLimit` on the endpoint.
+- **`RateLimitRules`**: collected in `AegisPluginRegistry.RateLimitRules`; enforcement is separate ([#120](https://github.com/danielvanginneken/Aegis.Auth/issues/120)). Until then, also call `RequireAegisRateLimit` on the endpoint.
 - **`ErrorStatusCodes`**: merged with the core map; statuses must be 400–599, and remapping an existing code to a different status throws. Unmapped codes return 400. Add the constants next to the plugin, or to `AuthErrors` for shared codes.
 - **`Validate`**: add one message per invalid setting. It runs with the core validation (`ValidateOnStart`), so the app fails to start with every message at once. New features stay **off by default**.
 

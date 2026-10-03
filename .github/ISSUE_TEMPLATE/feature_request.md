@@ -3,7 +3,7 @@ name: ✨ Feature Request
 about: Suggest a feature for Aegis.Auth
 title: "[Feature]: "
 labels: ["enhancement", "triage"]
-assignees: DanielvG-IT
+assignees: danielvanginneken
 ---
 
 ## Problem

@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-09-30
-- **Issue:** [#116](https://github.com/DanielvG-IT/Aegis.Auth/issues/116) (spike), feeding [#117](https://github.com/DanielvG-IT/Aegis.Auth/issues/117) (OIDC provider), [#118](https://github.com/DanielvG-IT/Aegis.Auth/issues/118) (MCP), [#119](https://github.com/DanielvG-IT/Aegis.Auth/issues/119) (CIMD)
+- **Issue:** [#116](https://github.com/danielvanginneken/Aegis.Auth/issues/116) (spike), feeding [#117](https://github.com/danielvanginneken/Aegis.Auth/issues/117) (OIDC provider), [#118](https://github.com/danielvanginneken/Aegis.Auth/issues/118) (MCP), [#119](https://github.com/danielvanginneken/Aegis.Auth/issues/119) (CIMD)
 - **Proof of concept:** [`tests/Aegis.Auth.Tests/Http/OidcProvider/`](../../tests/Aegis.Auth.Tests/Http/OidcProvider/)
 
 ## Context

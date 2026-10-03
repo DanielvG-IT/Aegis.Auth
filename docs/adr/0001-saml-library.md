@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-09-30
-- **Issue:** [#106](https://github.com/DanielvG-IT/Aegis.Auth/issues/106) (spike) · blocks [#107](https://github.com/DanielvG-IT/Aegis.Auth/issues/107) (SAML SP) · epic [#89](https://github.com/DanielvG-IT/Aegis.Auth/issues/89)
+- **Issue:** [#106](https://github.com/danielvanginneken/Aegis.Auth/issues/106) (spike) · blocks [#107](https://github.com/danielvanginneken/Aegis.Auth/issues/107) (SAML SP) · epic [#89](https://github.com/danielvanginneken/Aegis.Auth/issues/89)
 - **Proof of concept:** `tests/Aegis.Auth.Tests/Spikes/SamlLibrary/`
 
 ## Context

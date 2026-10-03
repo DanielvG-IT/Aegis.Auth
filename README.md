@@ -34,16 +34,16 @@ This is v0.1 — actively developed. The feature set below reflects what is **ac
 
 ### Known gaps
 
-- Rate limit counters are kept in memory per instance. Shared storage for multi-instance deployments and per-endpoint custom rules are tracked in [#120](https://github.com/DanielvG-IT/Aegis.Auth/issues/120) and [#98](https://github.com/DanielvG-IT/Aegis.Auth/issues/98).
+- Rate limit counters are kept in memory per instance. Shared storage for multi-instance deployments and per-endpoint custom rules are tracked in [#120](https://github.com/danielvanginneken/Aegis.Auth/issues/120) and [#98](https://github.com/danielvanginneken/Aegis.Auth/issues/98).
 
 ### Planned
 
-The full roadmap is tracked in [#86](https://github.com/DanielvG-IT/Aegis.Auth/issues/86): plugins, organizations, SSO (OIDC + SAML 2.0), SCIM, passkeys, 2FA, API keys, an OAuth/OIDC provider with MCP support, billing integrations and more. Contributors and coding agents should start with [`AGENTS.md`](AGENTS.md).
+The full roadmap is tracked in [#86](https://github.com/danielvanginneken/Aegis.Auth/issues/86): plugins, organizations, SSO (OIDC + SAML 2.0), SCIM, passkeys, 2FA, API keys, an OAuth/OIDC provider with MCP support, billing integrations and more. Contributors and coding agents should start with [`AGENTS.md`](AGENTS.md).
 
 ## Getting Started
 
 ```bash
-git clone https://github.com/DanielvG-IT/Aegis.Auth.git
+git clone https://github.com/danielvanginneken/Aegis.Auth.git
 cd Aegis.Auth
 dotnet restore
 dotnet build

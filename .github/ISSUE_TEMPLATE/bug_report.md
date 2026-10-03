@@ -3,7 +3,7 @@ name: 🐛 Bug Report
 about: Report a bug in Aegis.Auth
 title: "[Bug]: "
 labels: ["bug", "triage"]
-assignees: DanielvG-IT
+assignees: danielvanginneken
 ---
 
 ## Description
